@@ -1,0 +1,17 @@
+<odoo>
+  <data>
+    <record id="view_purchase_order_type_form_inherit_journal" model="ir.ui.view">
+      <field name="name">purchase.order.type.form.inherit.journal</field>
+      <field name="model">purchase.order.type</field>
+      <field name="inherit_id" ref="purchase_order_type.view_purchase_order_type_form"/>
+      <field name="arch" type="xml">
+        <!-- Filtrar diarios por las compañías activas del usuario -->
+        <xpath expr="//field[@name='company_id']" position="after">
+          <field name="journal_id"
+                 domain="[('type','=','purchase'),
+                          '|',('company_id','=',False),('company_id','in', allowed_company_ids)]"/>
+        </xpath>
+      </field>
+    </record>
+  </data>
+</odoo>

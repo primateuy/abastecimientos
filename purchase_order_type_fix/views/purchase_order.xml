@@ -1,0 +1,19 @@
+<odoo>
+  <data>
+    <record id="view_move_form_inherit_purchase_type" model="ir.ui.view">
+      <field name="name">account.move.form.inherit.purchase.type</field>
+      <field name="model">account.move</field>
+      <field name="inherit_id" ref="account.view_move_form"/>
+      <field name="priority" eval="99"/>
+      <field name="arch" type="xml">
+        <!-- Lo ubicamos después del diario -->
+        <xpath expr="//field[@name='journal_id']" position="after">
+          <field name="purchase_type_id"
+                invisible="[['move_type','not in',['in_invoice','in_refund']]]"
+                domain="['|', ('company_id','=', False),
+                              ('company_id','in', allowed_company_ids)]"/>
+        </xpath>
+      </field>
+    </record>
+  </data>
+</odoo>

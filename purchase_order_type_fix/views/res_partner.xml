@@ -1,0 +1,20 @@
+<odoo>
+  <data>
+    <record id="view_partner_form_inherit_purchase_type" model="ir.ui.view">
+      <field name="name">res.partner.form.inherit.purchase.type</field>
+      <field name="model">res.partner</field>
+      <field name="inherit_id" ref="base.view_partner_form"/>
+      <field name="priority" eval="99"/>
+      <field name="arch" type="xml">
+        <!-- Lo metemos en la pestaña Contabilidad, cerca de términos de pago de proveedor -->
+        <xpath expr="//page[@name='accounting']" position="inside">
+          <group string="Compras">
+            <field name="purchase_type"
+                   domain="['|', ('company_id','=', False),
+                                ('company_id','in', allowed_company_ids)]"/>
+          </group>
+        </xpath>
+      </field>
+    </record>
+  </data>
+</odoo>
