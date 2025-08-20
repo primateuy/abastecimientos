@@ -7,13 +7,7 @@
       <field name="model">stock.valuation.layer</field>
       <field name="inherit_id" ref="stock_account.stock_valuation_layer_tree"/>
       <field name="arch" type="xml">
-        <xpath expr="//field[@name='quantity']" position="replace">
-        
-          <field name="quantity_display" string="Cantidad movida" class="o_list_number text-right"/>
-        </xpath>
-        
-        
-        <xpath expr="//field[@name='quantity_display']" position="after">
+        <xpath expr="//field[@name='quantity']" position="after">
           <field string="* Valor en moneda reporte" options="{'currency_field': 'moneda_reporte_id'}" name="valorMonedaSecundaria" optional="show" />
           <field 
           string="* Moneda secundaria" name="moneda_reporte_id" optional="show" />
@@ -25,10 +19,9 @@
                  optional="show"
                  
                  />
-          
           <field name="inverse_company_rate" optional="show" string="* Cotización del día"/>
           <field name="company_rate" optional="hide" string="* Cotización del día inversa"/>
-          <field name="unitCostesDestinoInc" widget="monetary" optional="hide" options="{'currency_field': 'currency_id'}" string="* Costo total unitario"/>
+          <field name="unitCostesDestinoInc" widget="float" optional="hide" options="{'currency_field': 'currency_id'}" string="* Costo total unitario"/>
           <field name="unitCostesDestinoIncMR" widget="monetary" optional="show" options="{'currency_field': 'moneda_reporte_id'}" string="* Costo total unitario MR"/>
           <field name="valorizadoCosteDestino" widget="monetary" optional="hide" options="{'currency_field': 'currency_id'}" string="* Costo total"/>
           <field name="valorizadoCosteDestinoMR" widget="monetary" optional="show" options="{'currency_field': 'moneda_reporte_id'}" string="* Costo total MR"/>
