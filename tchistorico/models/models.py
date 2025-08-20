@@ -77,6 +77,29 @@ class StockValuationLayer(models.Model):
        
     )
 
+
+
+    @api.model
+    def _read_group_orderby(self, orderby, read_group_orderby, domain):
+        
+        
+        campos_problematicos = [
+            "unitCostesDestinoIncMR", 
+            "unitCostesDestinoInc", 
+            "valorizadoCosteDestino", 
+            "valorizadoCosteDestinoMR",
+            "inverse_company_rate",
+            "company_rate",
+            "ucmr"
+        ]
+        
+        if orderby and any(campo in orderby for campo in campos_problematicos):
+            return "", [], [] 
+        
+        result = super()._read_group_orderby(orderby, read_group_orderby, domain)
+        return result
+    
+    
     @api.depends('cotizacionDia', 'moneda_reporte_id', 'company_id.currency_id')
     def computeCompanyRate(self):
         for record in self:
@@ -119,12 +142,16 @@ class StockValuationLayer(models.Model):
         product = self.env['product.product'].browse(vals.get('product_id'))
         moneda_reporte = company.monedaDeReporte;
         fecha = vals.get('create_date') or fields.Date.context_today(self)
+        cantidad_svl = vals.get('quantity', 0)
+        if cantidad_svl == 0:
+            cantidad_svl = 1;
         
         # 1. Verificar y convertir a moneda principal si es necesario
         currency_id = vals.get('currency_id')
         if currency_id and currency_id != company.currency_id.id:
             currency = self.env['res.currency'].browse(currency_id) or 1;
             
+
             # Convertir el valor a moneda principal
             value_in_company_currency = currency._convert(
                 vals.get('value', 0),
@@ -156,7 +183,11 @@ class StockValuationLayer(models.Model):
             vals.update({
                 'cotizacionDia': cotizacion,
                 'valorMonedaSecundaria': float(vals['value']) * cotizacion,
-                'moneda_reporte_id': moneda_reporte.id
+                'moneda_reporte_id': moneda_reporte.id,
+                'unitCostesDestinoInc': (float(vals['value'])) / cantidad_svl,
+                'unitCostesDestinoIncMR': (float(vals['value']) * cotizacion) / cantidad_svl,
+                'valorizadoCosteDestino': float(vals['value']),
+                'valorizadoCosteDestinoMR': float(vals['value']) * cotizacion,
             })
 
             
@@ -176,13 +207,20 @@ class StockValuationLayer(models.Model):
                 vals.update({
                     'cotizacionDia': cotizacion or 1.0,
                     'valorMonedaSecundaria': float(vals['value']) * cotizacion,
-                    'moneda_reporte_id': moneda_reporte.id
+                    'moneda_reporte_id': moneda_reporte.id,
+                    'unitCostesDestinoInc': float(vals['value']),
+                    'unitCostesDestinoIncMR': float(vals['value']) * cotizacion,
+                    'valorizadoCosteDestino': float(vals['value']),
+                    'valorizadoCosteDestinoMR': float(vals['value']) * cotizacion,
+            
+                    
                 })
             else:
                 vals.update({
                     'cotizacionDia': 0.0,
                     'valorMonedaSecundaria': 0.0,
-                    'moneda_reporte_id': False
+                    'moneda_reporte_id': False,
+                    
                 })
         else:
             vals.update({
@@ -192,6 +230,7 @@ class StockValuationLayer(models.Model):
             })
 
         vals['ucmr'] = vals['unit_cost'] * vals.get('cotizacionDia', 1.0);
+        
 
         res = super().create(vals)
         return res
