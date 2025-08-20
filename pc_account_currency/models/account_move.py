@@ -23,5 +23,12 @@ class AccountMove(models.Model):
         self._change_payable_receivable_account()
         res = super().action_post()
         return res
+    
+    def create(self, vals):
+        """ Before create invoice change account for line with account_type in ('asset_receivable', 'liability_payable')"""
+        res = super().create(vals)
+        res._change_payable_receivable_account()
+        return res
+
 
 
