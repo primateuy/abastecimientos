@@ -24,11 +24,13 @@ class AccountMove(models.Model):
         res = super().action_post()
         return res
     
-    def create(self, vals):
-        """ Before create invoice change account for line with account_type in ('asset_receivable', 'liability_payable')"""
-        res = super().create(vals)
-        res._change_payable_receivable_account()
-        return res
-
+    @api.model_create_multi
+    def create(self, vals_list):
+        """After create, ajustar cuentas de líneas por cobrar/pagar."""
+        moves = super().create(vals_list)
+        # Llamar por registro para evitar singleton
+        for move in moves:
+            move._change_payable_receivable_account()
+        return moves
 
 
