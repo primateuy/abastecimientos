@@ -1,0 +1,93 @@
+<odoo>
+
+  <!-- Vista pivot -->
+  <record id="view_report_stock_by_warehouse_pivot" model="ir.ui.view">
+    <field name="name">report.stock.by.warehouse.pivot</field>
+    <field name="model">report.stock.by.warehouse</field>
+    <field name="arch" type="xml">
+      <pivot string="Stock por Almacén">
+        <field name="product_id" type="row"/>
+        <field name="warehouse_id" type="col"/>
+        <field name="qty_available" type="measure"/>
+        <field name="virtual_available" type="measure"/>
+        <field name="daily_consumption" type="measure"/>
+        <field name="days_of_stock" type="measure"/>
+      </pivot>
+    </field>
+  </record>
+
+
+  <!-- Búsqueda -->
+
+  <record id="view_mi_modelo_search" model="ir.ui.view">
+    <field name="name">report.stock.by.warehouse.search</field>
+    <field name="model">report.stock.by.warehouse</field>
+    <field name="arch" type="xml">
+      <search>
+        <!-- Búsqueda rápida por nombre -->
+        <field name="product_id" string="Nombre" search="1"/>
+        <!-- Filtro por almacén -->
+        <field name="warehouse_id" string="Almacén" search="1"/>
+      </search>
+    </field>
+  </record>
+
+  <!-- Acción -->
+  <record id="action_report_stock_by_warehouse" model="ir.actions.act_window">
+    <field name="name">Reporte de stock por almacén</field>
+    <field name="res_model">report.stock.by.warehouse</field>
+    <field name="view_mode">pivot</field>
+  </record>
+
+  <!-- Acción 2: Grupos de almacenes -->
+<record id="action_warehouse_groups" model="ir.actions.act_window">
+    <field name="name">Grupos de Almacenes</field>
+    <field name="res_model">stock.warehouse.group.report</field>
+    <field name="view_mode">tree,form</field>
+</record>
+
+      <!-- View stock.warehouse.group.report View Tree -->
+    <record id="view_stock_warehouse_group_report_report_tree" model="ir.ui.view">
+        <field name="name">view.stock.warehouse.group.report.tree</field>
+        <field name="model">stock.warehouse.group.report</field>
+        <field name="arch" type="xml">
+            <tree>
+                <field name="name"/>
+            </tree>
+        </field>
+    </record>
+
+    <!-- View stock.warehouse.group.report View Tree -->
+    <record id="view_stock_warehouse_group_report_report_form" model="ir.ui.view">
+        <field name="name">view.stock.warehouse.group.report.form</field>
+        <field name="model">stock.warehouse.group.report</field>
+        <field name="arch" type="xml">
+            <form string="Stock Warehouse Group Report">
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1>
+                            <field name="name" placeholder="Name..."/>
+                        </h1>
+                    </div>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_stock_warehouse_group_report" model="ir.actions.act_window">
+        <field name="name">Grupos de almacenes</field>
+        <field name="res_model">stock.warehouse.group.report</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+
+
+
+  <!-- Menú Padre-->
+  <menuitem id="menu_stock_by_warehouse_root" name="Stock por almacén" parent="stock.menu_stock_inventory_control" sequence="99"/>
+  <!-- Reporte -->
+  <menuitem id="menu_stock_report_pivot" name="Stock por Almacén" action="action_report_stock_by_warehouse" parent="menu_stock_by_warehouse_root"/>
+  <!-- Grupos -->
+  <menuitem id="menu_stock_report_groups" name="Grupos" action="action_warehouse_groups" parent="menu_stock_by_warehouse_root"/>
+
+</odoo>

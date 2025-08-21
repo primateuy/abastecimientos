@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<odoo>
+    <record id="view_warehouse_form_inherit_group_id" model="ir.ui.view">
+        <field name="name">stock.warehouse.form.inherit.group_id</field>
+        <field name="model">stock.warehouse</field>
+        <field name="inherit_id" ref="stock.view_warehouse" />
+        <field name="arch" type="xml">
+            <!-- Insertar el campo debajo del campo 'company_id' -->
+            <xpath expr="//field[@name='code']" position="after">
+                <field name="group_id" string="Grupo de Almacenes"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

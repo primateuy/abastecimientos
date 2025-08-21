@@ -1,0 +1,5 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_report_stock_by_warehouse,access.report.stock.by.warehouse,model_report_stock_by_warehouse,base.group_user,1,1,1,1
+
+access_stock_warehouse_group_report,access.stock.warehouse.group.report,model_stock_warehouse_group_report,base.group_user,1,1,1,1
+
