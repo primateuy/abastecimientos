@@ -77,11 +77,6 @@ class StockValuationLayer(models.Model):
        
     )
 
-    quantity_display = fields.Char(
-        string='Quantity Display',
-        compute='_compute_quantity_display',
-        store=False
-    )
 
 
     @api.model
@@ -93,7 +88,6 @@ class StockValuationLayer(models.Model):
             "unitCostesDestinoInc", 
             "valorizadoCosteDestino", 
             "valorizadoCosteDestinoMR",
-            "quantity_display",
             "inverse_company_rate",
             "company_rate",
             "ucmr"
@@ -105,11 +99,7 @@ class StockValuationLayer(models.Model):
         result = super()._read_group_orderby(orderby, read_group_orderby, domain)
         return result
     
-    def _compute_quantity_display(self):
-        for record in self:
-            # Comparar con 0 numérico y manejar posibles valores None
-            record.quantity_display = '' if record.quantity == 0 else str(record.quantity)
-
+    
     @api.depends('cotizacionDia', 'moneda_reporte_id', 'company_id.currency_id')
     def computeCompanyRate(self):
         for record in self:
