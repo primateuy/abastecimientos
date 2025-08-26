@@ -1,0 +1,14 @@
+<odoo>
+    <record id="view_account_payment_tree_grouped_simple" model="ir.ui.view">
+        <field name="name">account_payment_tree_grouped_simple</field>  <!-- Cambiado para evitar puntos -->
+        <field name="model">account.payment</field>
+        <field name="arch" type="xml">
+            <tree string="Pagos agrupados">
+                <field name="name"/>
+                <field name="partner_id"/>
+                <field name="transaction_type"/>
+                <field name="amount_signed"/>
+            </tree>
+        </field>
+    </record>
+</odoo>

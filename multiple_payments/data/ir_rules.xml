@@ -1,0 +1,18 @@
+<odoo>
+    <data>
+        <!-- Privatizar los pagos multiples por compañia -->
+        <record id="rule_payment_aggregator_company" model="ir.rule"> 
+            <field name="name">Payment aggregator by company</field> 
+            <field name="model_id" ref="model_mps_payment_aggregator" /> 
+            <field name="domain_force">[('company_id', '=', company_id)]</field>
+            <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+        </record>
+        <!-- Privatizar los talonarios por compañia -->
+        <record id="rule_receipt_books_company" model="ir.rule"> 
+            <field name="name">Receiptbooks by company</field> 
+            <field name="model_id" ref="model_mps_receipt_books" /> 
+            <field name="domain_force">[('company_id', '=', company_id)]</field>
+            <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+        </record>
+    </data>
+</odoo>

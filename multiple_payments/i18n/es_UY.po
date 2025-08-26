@@ -1,0 +1,519 @@
+# Translation of Odoo Server.
+# This file contains the translation of the following modules:
+# 	* multiple_payments
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Odoo Server 17.0+e-20250123\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2025-06-25 14:35+0000\n"
+"PO-Revision-Date: 2025-06-25 14:35+0000\n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: \n"
+"Plural-Forms: \n"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_methods_line__account_journal_id
+#: model:ir.model.fields,field_description:multiple_payments.field_res_currency__account_journal_id
+msgid "Account Journal"
+msgstr "Diario"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_aggregator__adenda
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_methods_line__adenda
+msgid "Adenda"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_aggregator__amount
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_methods_line__amount
+msgid "Amount"
+msgstr "Monto del recibo"
+
+#. module: multiple_payments
+#: model_terms:ir.ui.view,arch_db:multiple_payments.payment_aggregator_views_form
+msgid "Apply FIFO"
+msgstr "Aplicar FIFO"
+
+#. module: multiple_payments
+#: model_terms:ir.ui.view,arch_db:multiple_payments.payment_aggregator_views_form
+msgid ""
+"Are you sure you want to confirm the payment group? Once confirmed, payments"
+" will be processed and no uploaded data can be modified."
+msgstr ""
+"¿Está seguro de que desea confirmar? Una vez confirmado, se procesarán los "
+"pagos y no se podrán modificar los datos cargados."
+
+#. module: multiple_payments
+#: model_terms:ir.ui.view,arch_db:multiple_payments.payment_aggregator_views_form
+msgid "Assign All"
+msgstr "Asignar todo"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_aggregator__average_rate
+msgid "Average Rate"
+msgstr "Tasa promedio"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_methods_line__check_bank
+msgid "Check Bank"
+msgstr "Banco del cheque"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_methods_line__check_cash_date
+msgid "Check Cash Date"
+msgstr "Fecha de efectivo del cheque"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_methods_line__check_number
+msgid "Check Number"
+msgstr "Número del cheque"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_methods_line__check_vat
+msgid "Check Vat"
+msgstr "Identificación del cheque"
+
+#. module: multiple_payments
+#: model_terms:ir.ui.view,arch_db:multiple_payments.payment_aggregator_views_form
+msgid "Confirm"
+msgstr "Confirmar"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_aggregator__create_uid
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_methods_line__create_uid
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_receipt_books__create_uid
+msgid "Created by"
+msgstr "Creado por"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_aggregator__create_date
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_methods_line__create_date
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_receipt_books__create_date
+msgid "Created on"
+msgstr "Creado el"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_aggregator__mps_credits_line_ids
+msgid "Cuentas por Pagar/Cobrar"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model,name:multiple_payments.model_res_currency
+msgid "Currency"
+msgstr "Moneda"
+
+#. module: multiple_payments
+#: model:ir.model.fields.selection,name:multiple_payments.selection__mps_receipt_books__partner_type__customer
+msgid "Customer"
+msgstr "Cliente"
+
+#. module: multiple_payments
+#: model:ir.model.fields.selection,name:multiple_payments.selection__account_payment__transaction_type__customer_payment
+msgid "Customer Payment"
+msgstr "Pagos de cliente"
+
+#. module: multiple_payments
+#: model:ir.ui.menu,name:multiple_payments.general_payments_aggregator_menu
+msgid "Customer or Supplier Receipt"
+msgstr "Recibo de cliente o proveedor"
+
+#. module: multiple_payments
+#: model:ir.actions.act_window,name:multiple_payments.mps_receipt_books_customer_views_action
+msgid "Customer's Receiptbooks"
+msgstr "Talonarios de clientes"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_aggregator__date
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_methods_line__date
+msgid "Date"
+msgstr "Fecha"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_aggregator__debt_allocation
+msgid "Debt Allocation"
+msgstr "Asignación de deuda"
+
+#. module: multiple_payments
+#: model_terms:ir.ui.view,arch_db:multiple_payments.payment_aggregator_views_form
+msgid "Delete Unassigned"
+msgstr "Eliminar no asignados"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_aggregator__difference
+msgid "Difference"
+msgstr "Diferencia"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_aggregator__display_name
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_methods_line__display_name
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_receipt_books__display_name
+msgid "Display Name"
+msgstr "Nombre"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_receipt_books__document_type_id
+msgid "Document Type"
+msgstr "Tipo de documento"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_aggregator__domain_receiptbook_id
+msgid "Domain Receiptbook"
+msgstr "Dominio de Talonario"
+
+#. module: multiple_payments
+#. odoo-python
+#: code:addons/multiple_payments/models/payment_aggregator.py:0
+#: model:ir.model.fields.selection,name:multiple_payments.selection__mps_payment_aggregator__state__draft
+#, python-format
+msgid "Draft"
+msgstr "Borrador"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_receipt_books__enable_reverse_payment
+msgid "Enable Reverse Payment"
+msgstr "Habilitar pago inverso"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_methods_line__exchange_rate
+msgid "Exchange Rate"
+msgstr "Tasa de cambio"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_methods_line__exchange_rate_visibility
+msgid "Exchange Rate Visibility"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_aggregator__id
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_methods_line__id
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_receipt_books__id
+msgid "ID"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields.selection,name:multiple_payments.selection__mps_receipt_books__type__inbound
+msgid "Inbound"
+msgstr "Recibir"
+
+#. module: multiple_payments
+#: model:l10n_latam.document.type,name:multiple_payments.incoming_receipt
+msgid "Incoming Manual Receipt"
+msgstr "Recibo manual entrante"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_journal__intermediate_diary
+msgid "Intermediate Diary"
+msgstr "Diario intermedio"
+
+#. module: multiple_payments
+#. odoo-python
+#: code:addons/multiple_payments/models/payment_aggregator.py:0
+#: model:ir.model.fields.selection,name:multiple_payments.selection__account_payment__transaction_type__internal_transfer
+#, python-format
+msgid "Internal Transfer"
+msgstr "Transferencia Interna"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_methods_line__is_check
+msgid "Is Check"
+msgstr "Es un cheque"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_receipt_books__is_public
+msgid "Is Public"
+msgstr "Es pública?"
+
+#. module: multiple_payments
+#: model:ir.model,name:multiple_payments.model_account_journal
+msgid "Journal"
+msgstr "Diario"
+
+#. module: multiple_payments
+#: model:ir.model,name:multiple_payments.model_account_move_line
+msgid "Journal Item"
+msgstr "Apunte contable"
+
+#. module: multiple_payments
+#. odoo-python
+#: code:addons/multiple_payments/models/payment_aggregator.py:0
+#, python-format
+msgid "La linea de pago debe contener un diario contable"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_aggregator__write_uid
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_methods_line__write_uid
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_receipt_books__write_uid
+msgid "Last Updated by"
+msgstr "Última actualización por"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_aggregator__write_date
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_methods_line__write_date
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_receipt_books__write_date
+msgid "Last Updated on"
+msgstr "Última actualización"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_methods_line__memo
+msgid "Memo"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model,name:multiple_payments.model_mps_payment_aggregator
+msgid "Model to save payment aggregator"
+msgstr "Modelo para guardar los agrupadores de pago"
+
+#. module: multiple_payments
+#: model:ir.model,name:multiple_payments.model_mps_payment_methods_line
+msgid "Model to save the payment methods"
+msgstr "Modelo para guardar los metodos de pago"
+
+#. module: multiple_payments
+#: model:ir.model,name:multiple_payments.model_mps_receipt_books
+msgid "Model to save the receipt books information"
+msgstr "Modelo para guardar los talonarios"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_aggregator__mps_payment_methods_line_ids
+msgid "Mps Payment Methods Line"
+msgstr "Metodos pago"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_aggregator__name
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_receipt_books__name
+msgid "Name"
+msgstr "Nombre"
+
+#. module: multiple_payments
+#: model_terms:ir.ui.view,arch_db:multiple_payments.payment_aggregator_views_form
+msgid "Open Accounting Notes"
+msgstr "Abrir apuntes contables"
+
+#. module: multiple_payments
+#: model_terms:ir.ui.view,arch_db:multiple_payments.payment_aggregator_views_form
+msgid "Open Grouped Payments"
+msgstr "Abrir pagos agrupados"
+
+#. module: multiple_payments
+#: model:ir.model.fields.selection,name:multiple_payments.selection__mps_receipt_books__type__outbound
+msgid "Outbound"
+msgstr "Enviar"
+
+#. module: multiple_payments
+#: model:l10n_latam.document.type,name:multiple_payments.outgoing_receipt
+msgid "Outgoing Manual Receipt"
+msgstr "Recibo manual de salida"
+
+#. module: multiple_payments
+#: model_terms:ir.ui.view,arch_db:multiple_payments.payment_aggregator_views_form
+msgid "Outstanding Credits/Debits"
+msgstr "Créditos/débitos pendientes"
+
+#. module: multiple_payments
+#: model_terms:ir.ui.view,arch_db:multiple_payments.view_account_payment_tree_grouped_simple
+msgid "Pagos agrupados"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_receipt_books__partner_type
+msgid "Partner Type"
+msgstr "Tipo de empresa"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_aggregator__payment_account
+msgid "Payment Account"
+msgstr "Cuenta de pago"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_methods_line__mps_payment_aggregator_id
+msgid "Payment Aggregator"
+msgstr "Agrupador de pago"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_methods_line__payment_aggregator_currency_id
+msgid "Payment Aggregator Currency"
+msgstr "Moneda del agrupador de pago"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_methods_line__payment_amount
+msgid "Payment Amount"
+msgstr "Monto a pagar"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_methods_line__payment_method_id
+msgid "Payment Method"
+msgstr "Método de pago"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_methods_line__payment_method_domain
+msgid "Payment Method Domain"
+msgstr ""
+
+#. module: multiple_payments
+#: model_terms:ir.ui.view,arch_db:multiple_payments.payment_aggregator_views_form
+msgid "Payment Methods"
+msgstr "Métodos de pago"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_methods_line__payment_type_visibility
+msgid "Payment Type Visibility"
+msgstr ""
+
+#. module: multiple_payments
+#: model_terms:ir.ui.view,arch_db:multiple_payments.payment_aggregator_views_form
+msgid "Payment amount"
+msgstr "Monto del pago"
+
+#. module: multiple_payments
+#: model_terms:ir.ui.view,arch_db:multiple_payments.payment_aggregator_views_form
+msgid "Payment on account"
+msgstr "Pago a cuenta"
+
+#. module: multiple_payments
+#: model_terms:ir.ui.view,arch_db:multiple_payments.payment_aggregator_views_form
+msgid "Payment's methods"
+msgstr "Métodos de pago"
+
+#. module: multiple_payments
+#: model:ir.model,name:multiple_payments.model_account_payment
+msgid "Payments"
+msgstr "Pagos"
+
+#. module: multiple_payments
+#: model:ir.actions.act_window,name:multiple_payments.payments_aggregator_view_action
+msgid "Payments Aggregator"
+msgstr "Agrupador de pagos"
+
+#. module: multiple_payments
+#: model:ir.actions.act_window,name:multiple_payments.payments_aggregator_customers_view_action
+msgid "Payments Aggregator - Customers"
+msgstr "Agrupador de pagos - Clientes"
+
+#. module: multiple_payments
+#: model:ir.actions.act_window,name:multiple_payments.payments_aggregator_suppliers_view_action
+msgid "Payments Aggregator - Suppliers"
+msgstr "Agrupador de pagos - Proveedores"
+
+#. module: multiple_payments
+#: model:ir.ui.menu,name:multiple_payments.customers_payments_aggregator_menu
+#: model:ir.ui.menu,name:multiple_payments.payment_aggregator_parent_menu
+#: model:ir.ui.menu,name:multiple_payments.supplier_payments_aggregator_menu
+msgid "Payments aggregator"
+msgstr "Agrupador de pago"
+
+#. module: multiple_payments
+#. odoo-python
+#: code:addons/multiple_payments/models/payment_aggregator.py:0
+#, python-format
+msgid "Payments cannot be created with empty information."
+msgstr "Los pagos no pueden ser creados con información vacía"
+
+#. module: multiple_payments
+#: model:ir.model.fields.selection,name:multiple_payments.selection__mps_payment_aggregator__state__published
+msgid "Published"
+msgstr "Publicado"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_aggregator__receiptbook_id
+msgid "Receiptbook"
+msgstr "Talonario de recibos"
+
+#. module: multiple_payments
+#: model:ir.actions.act_window,name:multiple_payments.mps_receipt_books_views_action
+#: model:ir.ui.menu,name:multiple_payments.customer_receipt_books_menu
+#: model:ir.ui.menu,name:multiple_payments.receipt_books_menu
+#: model:ir.ui.menu,name:multiple_payments.supplier_receipt_books_menu
+msgid "Receiptbooks"
+msgstr "Talonarios"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_receipt_books__reference
+msgid "Reference"
+msgstr "Referencia"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_aggregator__state
+msgid "State"
+msgstr "Estado"
+
+#. module: multiple_payments
+#: model:ir.model.fields.selection,name:multiple_payments.selection__mps_receipt_books__partner_type__supplier
+msgid "Supplier"
+msgstr "Proveedor/a"
+
+#. module: multiple_payments
+#: model:ir.actions.act_window,name:multiple_payments.mps_receipt_books_supplier_views_action
+msgid "Supplier's Receiptbooks"
+msgstr "Talonarios de proovedores"
+
+#. module: multiple_payments
+#: model_terms:ir.ui.view,arch_db:multiple_payments.mps_receipt_books_views_form
+msgid "Talonario de Recibo de ejemplo"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,help:multiple_payments.field_mps_payment_methods_line__currency_id
+msgid "The currency used to enter statement"
+msgstr "La moneda utilizada para ingresar el estado de cuenta"
+
+#. module: multiple_payments
+#. odoo-python
+#: code:addons/multiple_payments/models/payment_aggregator.py:0
+#, python-format
+msgid "To make payments you must load the payments in the payment lines."
+msgstr ""
+"Para realizar los pagos debe cargar los pagos en los métodos de pago del "
+"agrupador"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line__total_import
+#: model_terms:ir.ui.view,arch_db:multiple_payments.payment_aggregator_views_form
+msgid "Total Import"
+msgstr "Importe a pagar(conciliar)"
+
+#. module: multiple_payments
+#: model_terms:ir.ui.view,arch_db:multiple_payments.payment_aggregator_views_form
+msgid "Total Import (External Currency)"
+msgstr "Importe en divisa"
+
+#. module: multiple_payments
+#: model_terms:ir.ui.view,arch_db:multiple_payments.payment_aggregator_views_form
+msgid "Total Residual Amount"
+msgstr "Importe residual en divisa"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_payment__transaction_type
+msgid "Transaction Type"
+msgstr "Tipo de transacción"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_methods_line__payment_type
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_receipt_books__type
+msgid "Type"
+msgstr "Tipo de pago"
+
+#. module: multiple_payments
+#: model_terms:ir.ui.view,arch_db:multiple_payments.payment_aggregator_views_form
+msgid "Update Accounting Notes"
+msgstr "Actualizar/Cargar todos"
+
+#. module: multiple_payments
+#: model:ir.model.fields.selection,name:multiple_payments.selection__account_payment__transaction_type__vendor_payment
+msgid "Vendor Payment"
+msgstr "Pagos del proveedor"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_aggregator__currency_id
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_methods_line__currency_id
+msgid "currency"
+msgstr "Moneda"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_aggregator__customer_id
+msgid "customer"
+msgstr "Cliente"

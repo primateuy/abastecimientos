@@ -1,0 +1,48 @@
+<odoo>
+
+    <!-- Form -->
+    <record id="mps_payment_methods_line_form" model="ir.ui.view">
+        <field name="name">mps.payment.methods.line.form</field>
+        <field name="model">mps.payment.methods.line</field>
+        <field name="arch" type="xml">
+            <form string="">
+                <header>
+                </header>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="payment_amount"/>
+                            <field name="currency_id" readonly="1" options="{'no_create': True, 'no_open': True}"/>
+                            <field name="amount"/>
+                            <field name="date"/>
+                            <field name="memo"/>
+                        </group>
+                        <group>
+                            <field name="account_journal_id" options="{'no_create': True}"/>
+                            <field name="payment_type" widget="radio"/>
+                            <field name="payment_method_id" options="{'no_create': True}"/>
+                            <field name="exchange_rate"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Tree -->
+    <record id="mps_payment_methods_line_tree" model="ir.ui.view">
+        <field name="name">mps.payment.methods.line.tree</field>
+        <field name="model">mps.payment.methods.line</field>
+        <field name="arch" type="xml">
+            <tree string="">
+                <field name="date"/>
+                <field name="account_journal_id"/>
+                <field name="payment_type"/>
+                <field name="currency_id"/>
+                <field name="payment_amount"/>
+                <field name="amount"/>
+                <field name="exchange_rate"/>
+            </tree>
+        </field>
+    </record>
+</odoo>

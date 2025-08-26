@@ -1,0 +1,216 @@
+<odoo>
+    <data>
+        <!-- Formulario -->
+        <record id="payment_aggregator_views_form" model="ir.ui.view">
+            <field name="name">mps.payment.aggregator.view.form</field>
+            <field name="model">mps.payment.aggregator</field>
+            <field name="arch" type="xml">
+                <form>
+                    <header>
+                        <button 
+                            name="button_change_state" 
+                            type="object" 
+                            string="Confirm" 
+                            class="oe_highlight" 
+                            invisible="state == 'published'"
+                            confirm="Are you sure you want to confirm the payment group? Once confirmed, payments will be processed and no uploaded data can be modified."
+                        />
+                        <field name="state" widget="statusbar"/>
+                    </header>
+                    <sheet>
+                        <div name="button_box">
+                            <button 
+                                name="button_open_accounting_notes" 
+                                type="object"
+                                string="Open Accounting Notes" 
+                                class="oe_highlight fa" 
+                                icon="fa-line-chart"
+                                invisible="state == 'draft'"
+                            />
+                            <button 
+                                name="button_open_grouped_payments" 
+                                type="object"
+                                string="Open Grouped Payments" 
+                                class="oe_highlight fa" 
+                                icon="fa-line-chart"
+                                invisible="state == 'draft'"
+                            />
+                        </div>
+
+                        <h1 class="oe_title">
+                            <field name="name" readonly="1"/>
+                        </h1>
+                        <group>
+                            <group>
+                                <field name="customer_id" readonly="state == 'published'" options="{'no_create': True, 'no_open': True}"/>
+                                <field name="date" readonly="state == 'published'"/>
+                                <field name="currency_id" options="{'no_create': True}" readonly="state == 'published'"/>
+                                <field name="domain_receiptbook_id" invisible="1"/>
+                                <field name="receiptbook_id" domain="domain_receiptbook_id" readonly="state == 'published'" options="{'no_create': False}"/>
+                                <field name="adenda" readonly="state == 'published'"/>
+                                <field name="average_rate" groups="base.group_no_one" readonly="1"/>
+                            </group>
+                            <group>
+                                <field name="payment_account" string="Payment on account" readonly="state == 'published'"/>
+                                <field name="amount" readonly="1" string="Payment's methods"/>
+                                <field name="debt_allocation" readonly="1"/>
+                                <field name="difference" readonly="1" />
+                            </group>
+                        </group>
+                        <notebook>
+                            <page name="payment_methods" string="Payment Methods">
+                                <field name="mps_payment_methods_line_ids" context="{'receiptbook_id': receiptbook_id, 'currency_id':currency_id}" readonly="state == 'published'" invisible="not receiptbook_id or not currency_id">
+                                    <tree>
+                                        <field name="date"/>
+                                        <field name="account_journal_id"/>
+                                        <field name="payment_type"/>
+                                        <field name="currency_id"/>
+                                        <field name="payment_amount"/>
+                                        <field name="amount"/>
+                                        <field name="exchange_rate"/>
+                                    </tree>
+                                    <form>
+                                        <group>
+                                            <group>
+                                                <field name="payment_amount" required="1" string="Payment amount"/>
+                                                <field name="payment_aggregator_currency_id" invisible="1"/>
+                                                <field name="currency_id" readonly='1' options="{'no_create': True}" required="1"/>
+                                                <field name="amount" required="1"/>
+                                                <field name="date" required="1"/>
+                                                <field name="memo"/>
+                                                <field name="adenda"/>
+                                            </group>
+                                            <group>
+                                                <field name="account_journal_id" options="{'no_create': True}" required="1"/>
+                                                <field name="payment_type_visibility" invisible="1"/>
+                                                <field name="payment_type" widget="radio" options="{'horizontal': true}" invisible="not payment_type_visibility"/>
+                                                <field name="payment_method_id" options="{'no_create': True}" domain="payment_method_domain" invisible="not account_journal_id" required="1"/>
+                                                <field name="payment_method_domain" invisible="1"/>
+                                                <field name="exchange_rate_visibility" invisible="1"/>
+                                                <field name="exchange_rate" invisible="not exchange_rate_visibility"/>
+                                                
+                                                <field name="is_check" invisible="1"/>
+                                                <field name="check_number" invisible="not is_check" required="is_check"/>
+                                                <field name="check_cash_date" invisible="not is_check" required="is_check"/>
+                                                <field name="check_bank" invisible="not is_check" required="is_check"/>
+                                                <field name="check_vat" invisible="not is_check" required="is_check"/>
+                                            </group>
+                                        </group>
+                                    </form>
+                                </field>
+                            </page>
+                            <page name="credits" string="Outstanding Credits/Debits">
+                                <button 
+                                    name="button_open_accounting_notes" 
+                                    type="object"
+                                    string="Open Accounting Notes" 
+                                    class="oe_highlight fa m-1" 
+                                    icon="fa-line-chart"
+                                    invisible="state == 'draft'"
+                                />
+                                <!-- <button 
+                                    name="button_open_grouped_payments" 
+                                    type="object"
+                                    string="Open Grouped Payments" 
+                                    class="oe_highlight fa m-1" 
+                                    icon="fa-line-chart"
+                                    invisible="state == 'draft'"
+                                /> -->
+                                <button 
+                                    name="button_update_accounting_notes" 
+                                    type="object"
+                                    string="Update Accounting Notes" 
+                                    class="fa btn btn-secondary m-1" 
+                                    icon="fa-refresh"
+                                    invisible="state == 'published'"
+                                />
+                                <button 
+                                    name="button_delete_accounting_notes" 
+                                    type="object"
+                                    string="Delete Unassigned" 
+                                    class="fa btn btn-secondary m-1" 
+                                    icon="fa-trash"
+                                    invisible="state == 'published'"
+                                />
+                                <button 
+                                    name="button_apply_fifo" 
+                                    type="object"
+                                    string="Apply FIFO" 
+                                    class="fa btn btn-secondary m-1" 
+                                    icon="fa-calendar-times-o"
+                                    invisible="state == 'published'"
+                                />
+                                <button 
+                                    name="button_assign_all" 
+                                    type="object"
+                                    string="Assign All" 
+                                    class="fa btn btn-secondary m-1" 
+                                    icon="fa-check-square-o"
+                                    invisible="state == 'published'"
+                                />
+                                <field name="account_move_line_payment_agg_ids" readonly="state == 'published'">
+                                    <tree editable="bottom">
+                                        <field name="date"/>
+                                        <field name="move_id" />
+                                        <field name="name" readonly="1"/>
+                                        <field name="payment_aggregator_amount_currency" sum="Total Import (External Currency)" readonly="1"/>
+                                        <field name="payment_aggregator_amount_residual" sum="Total Residual Amount" readonly="1"/>
+                                        <field name="payment_aggregator_total_import" sum="Total Import"/>
+                                        <field name="currency_id" column_invisible="True"/>
+                                        <field name="company_currency_id" column_invisible="True"/>
+                                        <field name="move_type" column_invisible="True"/>
+                                    </tree>
+                                </field>
+                            </page>
+                        </notebook>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <!-- Tree -->
+        <record id="payment_aggregator_view_tree" model="ir.ui.view">
+            <field name="name">mps.payment.aggregator.view.tree</field>
+            <field name="model">mps.payment.aggregator</field>
+            <field name="arch" type="xml">
+                <tree string="">
+                    <field name="name" />
+                    <field name="customer_id" />
+                    <field name="currency_id" />
+                    <field name="date" />
+                    <field name="state" />
+                </tree>
+            </field>
+        </record>
+
+        <!-- Action -->
+        <!-- General -->
+        <record id="payments_aggregator_view_action" model="ir.actions.act_window">
+            <field name="name">Payments Aggregator</field>
+            <field name="res_model">mps.payment.aggregator</field>
+            <field name="view_mode">tree,form</field>
+        </record>
+
+        <!-- Customers -->
+        <record id="payments_aggregator_customers_view_action" model="ir.actions.act_window">
+            <field name="name">Payments Aggregator - Customers</field>
+            <field name="res_model">mps.payment.aggregator</field>
+            <field name="view_mode">tree,form</field>
+            <field name="domain">[('receiptbook_id.partner_type','=','customer')]</field>
+            <field name="context">{
+                'default_domain_receiptbook_id':"[('is_public','=',True),('partner_type','=','customer')]"
+            }</field>
+        </record>
+
+        <!-- Suppliers -->
+        <record id="payments_aggregator_suppliers_view_action" model="ir.actions.act_window">
+            <field name="name">Payments Aggregator - Suppliers</field>
+            <field name="res_model">mps.payment.aggregator</field>
+            <field name="view_mode">tree,form</field>
+            <field name="domain">[('receiptbook_id.partner_type','=','supplier')]</field>
+            <field name="context">{
+                'default_domain_receiptbook_id':"[('is_public','=',True),('partner_type','=','supplier')]"
+            }</field>
+        </record>
+    </data>
+</odoo>
