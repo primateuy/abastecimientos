@@ -116,7 +116,7 @@ class MPPaymentMethodsLine(models.Model):
     def onchange_currency_id(self):
         if self.currency_id:
             if self.payment_aggregator_currency_id:
-                self.exchange_rate_visibility = self._checkSameCurrency() == False
+                self.exchange_rate_visibility = not (self.currency_id and self.payment_aggregator_currency_id and self.currency_id.id == self.payment_aggregator_currency_id.id)
             
             self.onchange_payment_amount()
     @api.onchange('payment_method_id')
