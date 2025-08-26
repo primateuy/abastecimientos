@@ -137,67 +137,43 @@ class PaymentAggregator(models.Model):
 
     # Metodo para crear los pagos de las lineas de pago
     
-    
     def _create_lines_payment_payments(self):
-                # Por cada línea de método, crear transferencia interna con su contraparte
-                for line in self.mps_payment_methods_line_ids:
-                    journal = line.account_journal_id
-                    if not journal:
-                        raise UserError(_("La linea de pago debe contener un diario contable"))
+            # Por cada línea de método, crear una transferencia interna
+            for line in self.mps_payment_methods_line_ids:
+                journal = line.account_journal_id
+                if not journal:
+                    raise UserError(_("La linea de pago debe contener un diario contable"))
 
-                    # Determinar origen/destino y montos
-                    if self.receiptbook_id.type == "inbound":
-                        origin_journal = self.currency_id.account_journal_id
-                        dest_journal = journal
-                        origin_currency = self.currency_id
-                        dest_currency = (line.currency_id or self.company_id.currency_id)
-                        origin_amount = line.amount or 0.0
-                        rate = line.exchange_rate or self.average_rate or 1.0
-                        dest_amount = origin_amount if dest_currency == origin_currency else (origin_amount / rate if rate else origin_amount)
-                    else:
-                        origin_journal = journal
-                        dest_journal = self.currency_id.account_journal_id
-                        origin_currency = (line.currency_id or self.company_id.currency_id)
-                        dest_currency = self.currency_id
-                        origin_amount = line.payment_amount or 0.0
-                        rate = line.exchange_rate or self.average_rate or 1.0
-                        dest_amount = origin_amount if dest_currency == origin_currency else (origin_amount * rate)
+                vals = self._get_standard_payment()
+                vals.update({
+                    'date': line.date,
+                    'is_internal_transfer': True,
+                    'payment_type': 'outbound',
+                    'ref': _('Internal Transfer'),
+                    'payment_method_id': line.payment_method_id.id if line.payment_method_id else False,
+                })
 
-                    # Crear OUT (origen) como transferencia interna
-                    vals_out = self._get_standard_payment()
-                    vals_out.update({
-                        'date': line.date,
-                        'journal_id': origin_journal.id,
-                        'is_internal_transfer': True,
-                        'destination_journal_id': dest_journal.id,
-                        'payment_type': 'outbound',   # dispara creación del par
-                        'partner_id': False,
-                        'amount': origin_amount,
-                        'currency_id': origin_currency.id,
-                        'ref': _('Internal Transfer'),
-                        'payment_method_id': line.payment_method_id.id if line.payment_method_id else False,
-                    })
-                    out_pay = self.create_publish_payment(vals_out)
+                if self.receiptbook_id.type == "inbound":
+                    # ORIGEN = diario de la moneda del recibo
+                    vals['journal_id'] = self.currency_id.account_journal_id.id
+                    # DESTINO = diario de la línea
+                    vals['destination_journal_id'] = journal.id
 
-                    # Si por alguna razón Odoo no creó el par, lo creamos nosotros
-                    if not getattr(out_pay, 'paired_internal_transfer_id', False):
-                        vals_in = self._get_standard_payment()
-                        vals_in.update({
-                            'date': line.date,
-                            'journal_id': dest_journal.id,
-                            'is_internal_transfer': True,
-                            'payment_type': 'inbound',
-                            'partner_id': False,
-                            'amount': dest_amount,
-                            'currency_id': dest_currency.id,
-                            'ref': _('Internal Transfer (paired)'),
-                        })
-                        in_pay = self.create_publish_payment(vals_in)
-                        try:
-                            out_pay.paired_internal_transfer_id = in_pay.id
-                            in_pay.paired_internal_transfer_id = out_pay.id
-                        except Exception:
-                            pass
+                    # Monto en moneda del ORIGEN (moneda del recibo)
+                    vals['amount'] = line.amount or 0.0
+                    vals['currency_id'] = self.currency_id.id
+                else:
+                    # ORIGEN = diario de la línea
+                    vals['journal_id'] = journal.id
+                    # DESTINO = diario de la moneda del recibo
+                    vals['destination_journal_id'] = self.currency_id.account_journal_id.id
+
+                    # Monto en moneda del ORIGEN (moneda del diario de la línea)
+                    vals['amount'] = line.payment_amount or 0.0
+                    vals['currency_id'] = (line.currency_id or self.company_id.currency_id).id
+
+                # Crear y postear la transferencia interna
+                self.create_publish_payment(vals)
 
     def _create_payment_acount(self):
         if self.payment_account > 0:
@@ -253,6 +229,7 @@ class PaymentAggregator(models.Model):
 
                     # Invocamos el metodo que comprueba si la factura puede pasar a pagada
                     credit_line.move_id._compute_payment_state()
+
     # Metodo para obtener el diccionario estandar para registrar un pago
     def _get_standard_payment(self):
         return {
