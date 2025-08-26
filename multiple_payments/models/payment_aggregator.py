@@ -149,7 +149,21 @@ class PaymentAggregator(models.Model):
             self.filter_credit_moves()
             return
     
-        # Accion del boton de eliminacion de cuentas en 0
+        
+    def button_apply_fifo(self):
+            if self.difference > 0 and self.account_move_line_payment_agg_ids:
+                sorted_moves = self.account_move_line_payment_agg_ids.sorted(key=lambda r: r.date or fields.Date.today())
+            
+                for move in sorted_moves:
+                    if move.payment_aggregator_total_import == 0:
+                        total_import = abs(move.credit) + abs(move.debit)
+                        if total_import <= 0:
+                            continue
+                        if (self.difference - total_import) >= 0:
+                            move.payment_aggregator_total_import = total_import
+                        else:
+                            break
+# Accion del boton de eliminacion de cuentas en 0
     def button_open_accounting_notes(self):
         """ Placeholder action to satisfy the view; replace with a real action if needed. """
         self.ensure_one()
