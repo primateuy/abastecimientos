@@ -30,3 +30,17 @@ class AccountPayment(models.Model):
                 record.transaction_type = 'vendor_payment'
             else:
                 record.transaction_type = False
+
+
+def set_transaction_type(self):
+    """Compatibility helper: set transaction_type like the compute."""
+    for record in self:
+        if getattr(record, 'is_internal_transfer', False):
+            record.transaction_type = 'internal_transfer'
+        elif record.payment_type == 'inbound':
+            record.transaction_type = 'customer_payment'
+        elif record.payment_type == 'outbound':
+            record.transaction_type = 'vendor_payment'
+        else:
+            record.transaction_type = False
+    return True
