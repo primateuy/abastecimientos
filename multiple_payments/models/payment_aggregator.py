@@ -111,22 +111,22 @@ class PaymentAggregator(models.Model):
                     method.adenda = self.adenda
 
     # Cambiar estatus del registro
+    
+    # Cambiar estatus del registro
     def button_change_state(self):
         if self.state == "draft":
-
             # Validamos pagos
             if len(self.mps_payment_methods_line_ids) == 0:
                 raise ValidationError(_("To make payments you must load the payments in the payment lines."))
 
-
             try:
-                # Recorrer los creditos y/o debitos
+                # Recorrer los créditos y/o débitos
                 self._create_invoices_payment()
 
                 # Validamos si tiene pago a cuenta para realizar el pago
                 self._create_payment_acount()
 
-                # Crear los pagos de los metodos de pago
+                # Crear los pagos de los métodos de pago
                 self._create_lines_payment_payments()
 
             except Exception as e:
@@ -135,10 +135,32 @@ class PaymentAggregator(models.Model):
         else:
             self.state = "draft"
 
-    # Metodo para crear los pagos de las lineas de pago
+    # --- Button actions referenced by the form view ---
+    def button_open_accounting_notes(self):
+        """ Placeholder action to satisfy the view; replace with a real action if needed. """
+        self.ensure_one()
+        return {'type': 'ir.actions.act_window_close'}
+
+    def button_open_grouped_payments(self):
+        """ Placeholder action to satisfy the view; replace with a real action if needed. """
+        self.ensure_one()
+        return {'type': 'ir.actions.act_window_close'}
+
+# Metodo para crear los pagos de las lineas de pago
 
 
-def _create_lines_payment_payments(self):
+
+    # --- Button actions referenced by the form view ---
+        def button_open_accounting_notes(self):
+            """ Placeholder action to satisfy the view; replace with a real action if needed. """
+            self.ensure_one()
+            return {'type': 'ir.actions.act_window_close'}
+    
+        def button_open_grouped_payments(self):
+            """ Placeholder action to satisfy the view; replace with a real action if needed. """
+            self.ensure_one()
+            return {'type': 'ir.actions.act_window_close'}
+    def _create_lines_payment_payments(self):
         # Por cada línea de método, crear una transferencia interna
         for line in self.mps_payment_methods_line_ids:
             journal = line.account_journal_id
@@ -174,3 +196,12 @@ def _create_lines_payment_payments(self):
 
             # Crear y postear la transferencia interna
             self.create_publish_payment(vals)
+
+    # --- Button actions referenced by the form view ---
+    def button_open_accounting_notes(self):
+        self.ensure_one()
+        return {'type': 'ir.actions.act_window_close'}
+
+    def button_open_grouped_payments(self):
+        self.ensure_one()
+        return {'type': 'ir.actions.act_window_close'}
