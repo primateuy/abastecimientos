@@ -8,22 +8,13 @@ class MPPaymentMethodsLine(models.Model):
 
     _name = 'mps.payment.methods.line'
     _description = 'Model to save the payment methods'
+    company_id = fields.Many2one('res.company', default=lambda self: self.env.company)
 
     # importe
-    payment_amount = fields.Monetary(
-        currency_field="currency_id"
-    )
+    payment_amount = fields.Monetary(currency_field="payment_aggregator_currency_id")
     # Moneda
-    currency_id = fields.Many2one(
-        'res.currency',
-        string='currency'
-    )
-    payment_aggregator_currency_id = fields.Many2one(
-        'res.currency',
-        store=False
-    )
-    # monto del recibo
-    amount = fields.Float()
+    currency_id = fields.Many2one('res.currency', string='Journal Currency', compute='_compute_currencies', store=True, readonly=False)
+    payment_aggregator_currency_id = fields.Many2one('res.currency', compute='_compute_currencies', store=True, readonly=False)
     # fecha
     date = fields.Date(related='mps_payment_aggregator_id.date')
     # memo
@@ -110,25 +101,12 @@ class MPPaymentMethodsLine(models.Model):
                 self.exchange_rate_visibility = self._checkSameCurrency() == False
             
             self.onchange_payment_amount()
-
-    # Metodo para verificar si se esta usando la misma moneda en el agrupador de pago
-    def _checkSameCurrency(self):
-        return self.currency_id.id == self.payment_aggregator_currency_id.id
-
-    # Onchange para calcular el precio de la tasa
-    @api.onchange('payment_amount','exchange_rate')
-    def onchange_payment_amount(self):
-        if self.payment_amount and self.exchange_rate and self._checkSameCurrency() == False:
-            if  self.payment_aggregator_currency_id.rate > self.currency_id.rate:
-                self.amount = self.payment_amount * self.exchange_rate
-            else:
-                self.amount = self.payment_amount / self.exchange_rate
-        elif (self.payment_amount and not self.exchange_rate) or (self.payment_amount and self._checkSameCurrency() == True):
-            self.amount = self.payment_amount
-
-    # Onchange para detectar si el metodo de pago es cheques
     @api.onchange('payment_method_id')
     def onchange_payment_method_id(self):
+        if self.payment_method_id:
+            self.is_check = self.payment_method_id.code == "check_printing"
+
+(self):
         if self.payment_method_id:
             self.is_check = self.payment_method_id.code == "check_printing"
     
@@ -194,3 +172,83 @@ class MPPaymentMethodsLine(models.Model):
         payment_method = self.env['account.payment.method'].search(domain, limit=1)
         
         return payment_method.id if payment_method else False
+
+    def _default_rate(self):
+        from_curr = self.currency_id or self.env.company.currency_id
+        to_curr = self.payment_aggregator_currency_id or self.env.company.currency_id
+        company = self.company_id or self.env.company
+        date = self.date or fields.Date.context_today(self)
+        try:
+            return from_curr._get_conversion_rate(from_curr, to_curr, company, date)
+        except Exception:
+            # Fallback simple ratio if rates exist
+            if getattr(from_curr, 'rate', False) and getattr(to_curr, 'rate', False):
+                return (to_curr.rate or 1.0) / (from_curr.rate or 1.0)
+            return 1.0
+
+    @api.depends('account_journal_id', 'company_id', 'mps_payment_aggregator_id', 'mps_payment_aggregator_id.currency_id')
+    def _compute_currencies(self):
+        for rec in self:
+            # Journal currency (fallback company)
+            journal_cur = rec.account_journal_id.currency_id or (rec.company_id or rec.env.company).currency_id
+            rec.currency_id = journal_cur
+            # Receipt currency from aggregator/context/company
+            agg_cur = False
+            if rec.mps_payment_aggregator_id and hasattr(rec.mps_payment_aggregator_id, 'currency_id') and rec.mps_payment_aggregator_id.currency_id:
+                agg_cur = rec.mps_payment_aggregator_id.currency_id
+            elif rec.env.context.get('currency_id'):
+                agg_cur = rec.env['res.currency'].browse(rec.env.context.get('currency_id'))
+            else:
+                agg_cur = (rec.company_id or rec.env.company).currency_id
+            rec.payment_aggregator_currency_id = agg_cur
+            # If same currency, normalize rate to 1 and align amounts
+            if rec.currency_id and rec.payment_aggregator_currency_id and rec.currency_id == rec.payment_aggregator_currency_id:
+                rec.exchange_rate = 1.0
+                if rec.payment_amount:
+                    rec.amount = rec.payment_amount
+
+    @api.onchange('account_journal_id', 'company_id', 'date')
+    def _onchange_currencies_and_date(self):
+        for rec in self:
+            # Recompute currencies
+            rec._compute_currencies()
+            # Set default rate when currencies defined
+            if rec.currency_id and rec.payment_aggregator_currency_id:
+                rec.exchange_rate = rec._default_rate()
+                if rec.payment_amount:
+                    rec.amount = rec.payment_amount if rec.currency_id == rec.payment_aggregator_currency_id else rec.payment_amount * rec.exchange_rate
+
+    @api.onchange('payment_amount')
+    def _onchange_payment_amount(self):
+        for rec in self:
+            if not rec.payment_amount:
+                continue
+            if rec.currency_id and rec.payment_aggregator_currency_id:
+                if rec.currency_id == rec.payment_aggregator_currency_id:
+                    rec.exchange_rate = 1.0
+                    rec.amount = rec.payment_amount
+                else:
+                    if not rec.exchange_rate:
+                        rec.exchange_rate = rec._default_rate()
+                    rec.amount = rec.payment_amount * rec.exchange_rate
+
+    @api.onchange('amount')
+    def _onchange_amount(self):
+        for rec in self:
+            # Keep payment_amount as the source of truth: adjust exchange_rate accordingly
+            if rec.payment_amount:
+                if rec.currency_id == rec.payment_aggregator_currency_id:
+                    rec.exchange_rate = 1.0
+                    rec.amount = rec.payment_amount
+                else:
+                    rec.exchange_rate = (rec.amount or 0.0) / (rec.payment_amount or 1.0) if rec.payment_amount else rec.exchange_rate
+
+    @api.onchange('exchange_rate')
+    def _onchange_exchange_rate(self):
+        for rec in self:
+            if rec.payment_amount:
+                if rec.currency_id == rec.payment_aggregator_currency_id:
+                    rec.exchange_rate = 1.0
+                    rec.amount = rec.payment_amount
+                else:
+                    rec.amount = rec.payment_amount * (rec.exchange_rate or 0.0)
