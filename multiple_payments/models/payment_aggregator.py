@@ -149,6 +149,8 @@ class PaymentAggregator(models.Model):
                     'date': line.date,
                     'is_internal_transfer': True,
                     'payment_type': 'outbound',
+                    'partner_id': False,
+                    'partner_type': False,
                     'ref': _('Internal Transfer'),
                     'payment_method_id': line.payment_method_id.id if line.payment_method_id else False,
                 })
@@ -361,3 +363,14 @@ class PaymentAggregator(models.Model):
         result = super().create(values)
         result.name = self.env['ir.sequence'].next_by_code('aggregator.sequence')
         return result
+
+    def button_update_accounting_notes(self):
+        """Stub added to keep legacy buttons working."""
+        self.ensure_one()
+        return True
+
+    def button_delete_accounting_notes(self):
+        """Stub added to keep legacy buttons working."""
+        self.ensure_one()
+        return True
+
