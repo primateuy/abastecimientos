@@ -267,7 +267,9 @@ class PaymentAggregator(models.Model):
     def _compute_debt_allocation(self):
         for record in self:
             record.debt_allocation = sum(record.account_move_line_payment_agg_ids.mapped('payment_aggregator_total_import'))
-            record.mps_credits_line_ids.total_import = record.account_move_line_payment_agg_ids.payment_aggregator_total_import
+            total_payments = sum(record.account_move_line_payment_agg_ids.mapped('payment_aggregator_total_import'))
+        for line in record.mps_credits_line_ids:
+            line.total_import = total_payments
 
     
     @api.onchange('customer_id', 'currency_id')
