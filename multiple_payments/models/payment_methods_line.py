@@ -4,22 +4,40 @@ import logging
 _logger = logging.getLogger(__name__)
 
 
+
 class MPPaymentMethodsLine(models.Model):
 
     _name = 'mps.payment.methods.line'
     _description = 'Model to save the payment methods'
+
     company_id = fields.Many2one('res.company', default=lambda self: self.env.company)
 
-    # importe
-    payment_amount = fields.Monetary(currency_field="payment_aggregator_currency_id")
-    # Moneda
-    currency_id = fields.Many2one('res.currency', string='Journal Currency', compute='_compute_currencies', store=True, readonly=False)
-    payment_aggregator_currency_id = fields.Many2one('res.currency', compute='_compute_currencies', store=True, readonly=False)
-    # fecha
-    date = fields.Date(related='mps_payment_aggregator_id.date')
-    # memo
-    memo = fields.Char()
+    # Monto en moneda del diario
+    payment_amount = fields.Monetary(currency_field='currency_id')
 
+    # Moneda del diario (o compañía si el diario no tiene)
+    currency_id = fields.Many2one(
+        'res.currency',
+        string='Journal Currency',
+        compute='_compute_currencies',
+        store=True,
+        readonly=False
+    )
+
+    # Monto en moneda del recibo
+    amount = fields.Monetary(currency_field='payment_aggregator_currency_id')
+
+    # Moneda del recibo (del aggregator; fallback context/company)
+    payment_aggregator_currency_id = fields.Many2one(
+        'res.currency',
+        compute='_compute_currencies',
+        store=True,
+        readonly=False
+    )
+
+    # fecha y memo
+    date = fields.Date(related='mps_payment_aggregator_id.date')
+    memo = fields.Char()
     account_journal_id = fields.Many2one(
         'account.journal',
         string='Account Journal',
