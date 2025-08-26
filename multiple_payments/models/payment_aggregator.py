@@ -374,3 +374,18 @@ class PaymentAggregator(models.Model):
         self.ensure_one()
         return True
 
+    def _delete_accounting_notes(self):
+        """Legacy stub: no-op to keep buttons working."""
+        self.ensure_one()
+        return True
+
+    def _update_accounting_notes(self):
+        """Legacy stub: no-op to keep buttons working."""
+        self.ensure_one()
+        return True
+
+    def _open_accounting_notes(self):
+        """Legacy stub: no-op to keep buttons working."""
+        self.ensure_one()
+        return True
+
