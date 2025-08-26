@@ -148,12 +148,16 @@ class PaymentAggregator(models.Model):
             
             # Construimos el diccionario para el pago
             payment_details = self._get_standard_payment()
-            payment_details['date'] = payment_method["date"]
-            payment_details['amount'] = payment_method["amount"]
-            payment_details['payment_type'] = self["receiptbook_id"]["type"] if not self["receiptbook_id"]["enable_reverse_payment"] else payment_method["payment_type"]
+            payment_details['date'] = payment_method.date
+            # amount in journal currency (line's journal)
+            payment_details['amount'] = payment_method.payment_amount or 0.0
+            # force currency to journal currency
+            payment_details['currency_id'] = payment_method.currency_id.id if payment_method.currency_id else False
+            # if talonario no invierte, usar tipo de talonario; si invierte, usar tipo de la línea
+            payment_details['payment_type'] = self.receiptbook_id.type if not self.receiptbook_id.enable_reverse_payment else payment_method.payment_type
             payment_details['is_internal_transfer'] = True   # Marcamos
             payment_details['ref'] = _('Internal Transfer')   # Referencia
-            payment_details['payment_method_id'] = payment_method["payment_method_id"]["id"]
+            payment_details['payment_method_id'] = payment_method.payment_method_id.id if payment_method.payment_method_id else False
             
             # Validar el sentido del talonario para registrar el pago, ya sea saliente o entrante
             if self.receiptbook_id.type == "outbound":
@@ -161,10 +165,10 @@ class PaymentAggregator(models.Model):
                 # payment_details['destination_journal_id'] = journal.id # Diario destino
 
                 payment_details['journal_id'] = journal.id # Diario origen
-                payment_details['destination_journal_id'] = self.currency_id.account_journal_id.id,
+                payment_details['destination_journal_id'] = self.currency_id.account_journal_id.id
             else:
                 payment_details['journal_id'] = journal.id # Diario origen
-                payment_details['destination_journal_id'] = self.currency_id.account_journal_id.id, # Diario destino
+                payment_details['destination_journal_id'] = self.currency_id.account_journal_id.id  # Diario destino
             
             # Creamos el pago
             self.create_publish_payment(payment_details)
