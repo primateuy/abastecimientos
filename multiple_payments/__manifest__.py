@@ -22,9 +22,11 @@
         "views/res_currency_views.xml",
         "views/account_journal_views.xml",
         "views/ir_menu_views.xml",
-        "views/payment_view.xml"
+        "views/payment_view.xml",
         # Reports
     ],
     "installable": True,
     "application": False,
+
+    'version': '16.0.20250826232133'
 }
