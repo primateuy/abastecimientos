@@ -145,18 +145,11 @@ class PaymentAggregator(models.Model):
         """ Placeholder action to satisfy the view; replace with a real action if needed. """
         self.ensure_one()
         return {'type': 'ir.actions.act_window_close'}
-
-
     def button_update_accounting_notes(self):
             self.filter_credit_moves()
             return
     
-    # Accion del boton de eliminacion de cuentas en 0
-    # Metodo para crear los pagos de las lineas de pago
-
-
-
-    # --- Button actions referenced by the form view ---
+        # Accion del boton de eliminacion de cuentas en 0
     def button_open_accounting_notes(self):
         """ Placeholder action to satisfy the view; replace with a real action if needed. """
         self.ensure_one()
@@ -211,3 +204,7 @@ class PaymentAggregator(models.Model):
     def button_open_grouped_payments(self):
         self.ensure_one()
         return {'type': 'ir.actions.act_window_close'}
+    def button_delete_accounting_notes(self):
+            # Metodo para eliminar los registros donde total_import es 0
+            self._delete_accounting_notes()
+            return
