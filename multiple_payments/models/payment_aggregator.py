@@ -146,20 +146,26 @@ class PaymentAggregator(models.Model):
         self.ensure_one()
         return {'type': 'ir.actions.act_window_close'}
 
-# Metodo para crear los pagos de las lineas de pago
+
+    def button_update_accounting_notes(self):
+            self.filter_credit_moves()
+            return
+    
+    # Accion del boton de eliminacion de cuentas en 0
+    # Metodo para crear los pagos de las lineas de pago
 
 
 
     # --- Button actions referenced by the form view ---
-        def button_open_accounting_notes(self):
-            """ Placeholder action to satisfy the view; replace with a real action if needed. """
-            self.ensure_one()
-            return {'type': 'ir.actions.act_window_close'}
+    def button_open_accounting_notes(self):
+        """ Placeholder action to satisfy the view; replace with a real action if needed. """
+        self.ensure_one()
+        return {'type': 'ir.actions.act_window_close'}
     
-        def button_open_grouped_payments(self):
-            """ Placeholder action to satisfy the view; replace with a real action if needed. """
-            self.ensure_one()
-            return {'type': 'ir.actions.act_window_close'}
+    def button_open_grouped_payments(self):
+        """ Placeholder action to satisfy the view; replace with a real action if needed. """
+        self.ensure_one()
+        return {'type': 'ir.actions.act_window_close'}
     def _create_lines_payment_payments(self):
         # Por cada línea de método, crear una transferencia interna
         for line in self.mps_payment_methods_line_ids:
