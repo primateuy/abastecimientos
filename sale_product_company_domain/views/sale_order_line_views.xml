@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+  <!-- Form de la línea (popup) -->
+  <record id="view_order_line_form_product_company_domain" model="ir.ui.view">
+    <field name="name">sale.order.line.form.product.company.domain</field>
+    <field name="model">sale.order.line</field>
+    <field name="inherit_id" ref="sale.view_order_line_form"/>
+    <field name="arch" type="xml">
+      <xpath expr="//field[@name='product_id']" position="attributes">
+        <attribute name="domain">
+          [
+            ('sale_ok','=',True),
+            '|', ('company_id','in',[False, parent.company_id.id]),
+                ('product_tmpl_id.company_id','in',[False, parent.company_id.id]),
+            '|', ('product_tmpl_id.company_ids','=',[]),
+                ('product_tmpl_id.company_ids','in',[parent.company_id.id])
+          ]
+        </attribute>
+        <attribute name="context">
+          {
+            'company_id': parent.company_id.id,
+            'allowed_company_ids': [parent.company_id.id]
+          }
+        </attribute>
+      </xpath>
+    </field>
+  </record>
+
+  <!-- Árbol embebido en el pedido (one2many) -->
+  <record id="view_order_form_tree_product_company_domain" model="ir.ui.view">
+    <field name="name">sale.order.form.tree.product.company.domain</field>
+    <field name="model">sale.order</field>
+    <field name="inherit_id" ref="sale.view_order_form"/>
+    <field name="arch" type="xml">
+      <xpath expr="//field[@name='order_line']//tree//field[@name='product_id']" position="attributes">
+        <attribute name="domain">
+          [
+            ('sale_ok','=',True),
+            '|', ('company_id','in',[False, parent.company_id.id]),
+                ('product_tmpl_id.company_id','in',[False, parent.company_id.id]),
+            '|', ('product_tmpl_id.company_ids','=',[]),
+                ('product_tmpl_id.company_ids','in',[parent.company_id.id])
+          ]
+        </attribute>
+        <attribute name="context">
+          {
+            'company_id': parent.company_id.id,
+            'allowed_company_ids': [parent.company_id.id]
+          }
+        </attribute>
+      </xpath>
+    </field>
+  </record>
+</odoo>
