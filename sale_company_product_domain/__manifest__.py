@@ -10,5 +10,5 @@
     "data": [
         "views/sale_order_views.xml"
     ],
-    "installable": true
+    "installable": True
 }
