@@ -6,3 +6,4 @@ from . import payment_methods_line
 from . import account_move_line
 from . import account_payment
 from . import account_move_line_payment_aggregator
+from . import aggregator_buttons
