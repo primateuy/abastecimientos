@@ -70,20 +70,20 @@ class PaymentAggregator(models.Model):
 
     # Metodos de pago
     mps_payment_methods_line_ids = fields.One2many(
-        'mps.payment.methods.line',
+        'mps.payment.methods.line', 
         'mps_payment_aggregator_id'
     )
 
     # apuntes contables
     mps_credits_line_ids = fields.Many2many(
-        'account.move.line',
+        'account.move.line', 
         string='Cuentas por Pagar/Cobrar',
     )
     average_rate = fields.Float(compute='_compute_average_rate')
 
     account_move_line_payment_agg_ids = fields.One2many(
         'account.move.line.payment.aggregator',
-        'payment_aggregator_id'
+        'payment_aggregator_id' 
     )
 
     # Se suma los montos de los metodos de pago
@@ -92,7 +92,7 @@ class PaymentAggregator(models.Model):
         payment_lines = self.mps_payment_methods_line_ids
         if len(payment_lines) > 0:
             self.average_rate = sum(payment_lines.mapped("exchange_rate")) / len(payment_lines)
-        else:
+        else: 
             self.average_rate = 0
 
 
@@ -102,7 +102,7 @@ class PaymentAggregator(models.Model):
         for record in self:
             record.amount = sum(self.mps_payment_methods_line_ids.mapped("amount"))
 
-    # Si el adenda se cambia, se lo agregamos a los metodos de pago
+    # Si el adenda se cambia, se lo agregamos a los metodos de pago 
     @api.onchange('adenda')
     def onchange_adenda(self):
         if self.adenda:
@@ -111,22 +111,22 @@ class PaymentAggregator(models.Model):
                     method.adenda = self.adenda
 
     # Cambiar estatus del registro
-    
-    # Cambiar estatus del registro
     def button_change_state(self):
         if self.state == "draft":
+           
             # Validamos pagos
             if len(self.mps_payment_methods_line_ids) == 0:
                 raise ValidationError(_("To make payments you must load the payments in the payment lines."))
 
+           
             try:
-                # Recorrer los créditos y/o débitos
+                # Recorrer los creditos y/o debitos
                 self._create_invoices_payment()
 
                 # Validamos si tiene pago a cuenta para realizar el pago
                 self._create_payment_acount()
 
-                # Crear los pagos de los métodos de pago
+                # Crear los pagos de los metodos de pago
                 self._create_lines_payment_payments()
 
             except Exception as e:
@@ -135,45 +135,9 @@ class PaymentAggregator(models.Model):
         else:
             self.state = "draft"
 
-    # --- Button actions referenced by the form view ---
-    def button_open_accounting_notes(self):
-        """ Placeholder action to satisfy the view; replace with a real action if needed. """
-        self.ensure_one()
-        return {'type': 'ir.actions.act_window_close'}
-
-    def button_open_grouped_payments(self):
-        """ Placeholder action to satisfy the view; replace with a real action if needed. """
-        self.ensure_one()
-        return {'type': 'ir.actions.act_window_close'}
-    def button_update_accounting_notes(self):
-            self.filter_credit_moves()
-            return
+    # Metodo para crear los pagos de las lineas de pago
     
-        
-    def button_apply_fifo(self):
-            if self.difference > 0 and self.account_move_line_payment_agg_ids:
-                sorted_moves = self.account_move_line_payment_agg_ids.sorted(key=lambda r: r.date or fields.Date.today())
-            
-                for move in sorted_moves:
-                    if move.payment_aggregator_total_import == 0:
-                        total_import = abs(move.credit) + abs(move.debit)
-                        if total_import <= 0:
-                            continue
-                        if (self.difference - total_import) >= 0:
-                            move.payment_aggregator_total_import = total_import
-                        else:
-                            break
-# Accion del boton de eliminacion de cuentas en 0
-    def button_open_accounting_notes(self):
-        """ Placeholder action to satisfy the view; replace with a real action if needed. """
-        self.ensure_one()
-        return {'type': 'ir.actions.act_window_close'}
-    
-    def button_open_grouped_payments(self):
-        """ Placeholder action to satisfy the view; replace with a real action if needed. """
-        self.ensure_one()
-        return {'type': 'ir.actions.act_window_close'}
-    def _create_lines_payment_payments(self):
+def _create_lines_payment_payments(self):
         # Por cada línea de método, crear una transferencia interna
         for line in self.mps_payment_methods_line_ids:
             journal = line.account_journal_id
@@ -209,16 +173,3 @@ class PaymentAggregator(models.Model):
 
             # Crear y postear la transferencia interna
             self.create_publish_payment(vals)
-
-    # --- Button actions referenced by the form view ---
-    def button_open_accounting_notes(self):
-        self.ensure_one()
-        return {'type': 'ir.actions.act_window_close'}
-
-    def button_open_grouped_payments(self):
-        self.ensure_one()
-        return {'type': 'ir.actions.act_window_close'}
-    def button_delete_accounting_notes(self):
-            # Metodo para eliminar los registros donde total_import es 0
-            self._delete_accounting_notes()
-            return
