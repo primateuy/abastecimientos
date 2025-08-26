@@ -245,22 +245,22 @@ class PaymentAggregator(models.Model):
             'payment_method_id': self.env.ref('account.account_payment_method_manual_in').id, # Metodo de pago
             'payment_aggregator_id': self.id
         }
-    
+
     # Metodo para crear un pago y publicarlo
     def create_publish_payment(self, payment_details):
         if not payment_details:
             raise ValidationError(_("Payments cannot be created with empty information."))
-        # Creamos las transferencias internas
         payment_id = self.env['account.payment'].create(payment_details)
-        # Confirmamos el pago
         payment_id.action_post()
-        payment_id.set_transaction_type()
-        payment_id.line_ids.payment_aggregator_id = self.id
-
-        # Retornamos el pago
+        # Guardado opcional de transaction_type para compatibilidad si el helper existe
+        if hasattr(payment_id, 'set_transaction_type'):
+            payment_id.set_transaction_type()
+        # Relacionar con el agregador en líneas si corresponde
+        if hasattr(payment_id, 'line_ids') and 'payment_aggregator_id' in payment_id.line_ids._fields:
+            payment_id.line_ids.payment_aggregator_id = self.id
         return payment_id
 
-    # Se calcula la diferencia
+# Se calcula la diferencia
     @api.depends('amount', 'payment_account', 'debt_allocation')
     def _compute_difference(self):
         for record in self:
@@ -388,4 +388,3 @@ class PaymentAggregator(models.Model):
         """Legacy stub: no-op to keep buttons working."""
         self.ensure_one()
         return True
-
