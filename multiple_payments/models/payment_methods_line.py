@@ -266,3 +266,23 @@ class MPPaymentMethodsLine(models.Model):
                     rec.amount = rec.payment_amount
                 else:
                     rec.amount = rec.payment_amount * (rec.exchange_rate or 0.0)
+
+
+    # Alias requerido por vistas/form que llaman explicitamente a onchange_payment_amount()
+    @api.onchange('payment_amount', 'exchange_rate')
+    def onchange_payment_amount(self):
+        for rec in self:
+            same = bool(rec.currency_id and rec.payment_aggregator_currency_id and rec.currency_id.id == rec.payment_aggregator_currency_id.id)
+            if not rec.payment_amount:
+                continue
+            if same:
+                rec.exchange_rate = 1.0
+                rec.amount = rec.payment_amount
+            else:
+                # asegurar tasa
+                if not rec.exchange_rate:
+                    try:
+                        rec.exchange_rate = rec._default_rate()
+                    except Exception:
+                        rec.exchange_rate = 1.0
+                rec.amount = rec.payment_amount * (rec.exchange_rate or 0.0)
