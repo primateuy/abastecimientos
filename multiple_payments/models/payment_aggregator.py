@@ -320,40 +320,17 @@ class PaymentAggregator(models.Model):
         
     }
     
+    
     def button_open_grouped_payments(self):
         self.ensure_one()
-        
-        # Buscar la vista específica si existe
-        view_id = self.env.ref('multiple_payments.view_account_payment_tree_grouped_simple', False)
-        
         return {
-            'name': 'Pagos Agrupados',
             'type': 'ir.actions.act_window',
+            'name': _('Pagos Agrupados'),
             'res_model': 'account.payment',
             'view_mode': 'tree,form',
-            'context': {
-                'group_by': ['transaction_type'],
-                'search_default_partner_id': self.customer_id.id if self.customer_id else False,
-            },
-            'domain': [('payment_aggregator_id', '=', self.id)]
+            'domain': [('payment_aggregator_id', '=', self.id)],
+            'context': {'group_by': ['transaction_type']},
         }
-    
-    def button_update_accounting_notes(self):
-        self.filter_credit_moves()
-        return
-    
-    # Accion del boton de eliminacion de cuentas en 0
-    def button_delete_accounting_notes(self):
-        # Metodo para eliminar los registros donde total_import es 0
-        self._delete_accounting_notes()
-        return
-    
-    def _delete_accounting_notes(self):
-        # Filtrar solo los registros donde total_import es 0
-        lines_to_remove = self.account_move_line_payment_agg_ids.filtered(lambda line: line.payment_aggregator_total_import == 0)
-        # Eliminar solo esas líneas
-        self.write({'account_move_line_payment_agg_ids': [(3, line.id) for line in lines_to_remove]})
-        return True
 
     def button_apply_fifo(self):
         if self.difference > 0 and self.account_move_line_payment_agg_ids:
