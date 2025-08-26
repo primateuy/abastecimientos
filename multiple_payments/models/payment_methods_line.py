@@ -106,10 +106,6 @@ class MPPaymentMethodsLine(models.Model):
         if self.payment_method_id:
             self.is_check = self.payment_method_id.code == "check_printing"
 
-(self):
-        if self.payment_method_id:
-            self.is_check = self.payment_method_id.code == "check_printing"
-    
     # Metodo para obtener la moneda del agrupador pago
     def _getPaymentAggregatorCurrency(self):
         return self.env["res.currency"].search(
