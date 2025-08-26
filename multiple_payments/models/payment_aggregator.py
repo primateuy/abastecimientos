@@ -148,6 +148,7 @@ class PaymentAggregator(models.Model):
                 vals.update({
                     'date': line.date,
                     'is_internal_transfer': True,
+                    'payment_type': 'outbound',
                     'ref': _('Internal Transfer'),
                     'payment_method_id': line.payment_method_id.id if line.payment_method_id else False,
                 })
