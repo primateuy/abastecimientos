@@ -1,0 +1,5 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_payment_aggregator_group_admin,payment.aggregator.group.admin,model_mps_payment_aggregator,base.group_system,1,1,1,1
+access_receipt_books_group_admin,receipt.books.group.admin,model_mps_receipt_books,base.group_system,1,1,1,1
+access_mps_payment_methods_line_group_admin,mps.payment.methods.line.group.admin,model_mps_payment_methods_line,base.group_system,1,1,1,1
+access_account_move_line_payment_aggregator_group_admin,account.move.line.payment.aggregator.group.admin,model_account_move_line_payment_aggregator,base.group_system,1,1,1,1

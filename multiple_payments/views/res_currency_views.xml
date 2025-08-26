@@ -1,0 +1,12 @@
+<odoo>
+    <record id="res_currency_view_inherit_form" model="ir.ui.view">
+        <field name="name">res.currency.view.inherit.form</field>
+        <field name="model">res.currency</field>
+        <field name="inherit_id" ref="base.view_currency_form" />
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='full_name']" position="after">
+                <field name="account_journal_id" options="{'no_create': True}"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>
