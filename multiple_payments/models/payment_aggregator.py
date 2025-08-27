@@ -118,7 +118,9 @@ class PaymentAggregator(models.Model):
             if len(self.mps_payment_methods_line_ids) == 0:
                 raise ValidationError(_("To make payments you must load the payments in the payment lines."))
 
-           
+            if self.difference != 0:
+                raise ValidationError(_("Difference must be 0 to publish a payments aggregator."))
+
             try:
                 # Recorrer los creditos y/o debitos
                 self._create_invoices_payment()
@@ -149,7 +151,7 @@ class PaymentAggregator(models.Model):
             # Construimos el diccionario para el pago
             payment_details = self._get_standard_payment()
             payment_details['date'] = payment_method["date"]
-            payment_details['amount'] = payment_method["amount"]
+            payment_details['amount'] = payment_method["payment_amount"]
             payment_details['payment_type'] = self["receiptbook_id"]["type"] if not self["receiptbook_id"]["enable_reverse_payment"] else payment_method["payment_type"]
             payment_details['is_internal_transfer'] = True   # Marcamos
             payment_details['ref'] = _('Internal Transfer')   # Referencia
@@ -263,7 +265,8 @@ class PaymentAggregator(models.Model):
     def _compute_debt_allocation(self):
         for record in self:
             record.debt_allocation = sum(record.account_move_line_payment_agg_ids.mapped('payment_aggregator_total_import'))
-            record.mps_credits_line_ids.total_import = record.account_move_line_payment_agg_ids.payment_aggregator_total_import
+            for credit_line, agg_line in zip(record.mps_credits_line_ids, record.account_move_line_payment_agg_ids):
+                credit_line.total_import = agg_line.payment_aggregator_total_import
 
     
     @api.onchange('customer_id', 'currency_id')
@@ -288,13 +291,14 @@ class PaymentAggregator(models.Model):
         aggregator_ids = []
         if credit_lines:
             for credit_line in credit_lines:
-                aggregator_record = self.env['account.move.line.payment.aggregator'].create({
-                    'account_move_line_id': credit_line.id,
-                    'move_id': credit_line.move_id.id,
-                    'payment_aggregator_amount_currency': credit_line.amount_currency,
-                    'payment_aggregator_amount_residual': credit_line.amount_residual
-                })
-                aggregator_ids.append(aggregator_record.id)
+                if credit_line.amount_residual != 0 and credit_line.parent_state != 'cancel':
+                    aggregator_record = self.env['account.move.line.payment.aggregator'].create({
+                        'account_move_line_id': credit_line.id,
+                        'move_id': credit_line.move_id.id,
+                        'payment_aggregator_amount_currency': credit_line.amount_currency,
+                        'payment_aggregator_amount_residual': credit_line.amount_residual_currency
+                    })
+                    aggregator_ids.append(aggregator_record.id if aggregator_record.id else aggregator_record.origin)
         self.account_move_line_payment_agg_ids = [(6, 0, aggregator_ids)]
     
     def button_open_accounting_notes(self):
@@ -377,3 +381,9 @@ class PaymentAggregator(models.Model):
         result = super().create(values)
         result.name = self.env['ir.sequence'].next_by_code('aggregator.sequence')
         return result
+
+    @api.onchange('receiptbook_id')
+    def _validate_recieptbook (self):
+        if self.receiptbook_id.partner_type:
+            if str(self.receiptbook_id.partner_type) not in self.domain_receiptbook_id:
+                raise ValidationError(_(f'You cannot set a {self.receiptbook_id.partner_type.capitalize()} reciept type in this payment aggregator'))
