@@ -12,7 +12,7 @@
     "website": "https://github.com/OCA/stock-logistics-availability",
     "depends": [
         "stock_available_base_exclude_location",
-        "stock_location_children"
+        "stock_location_children",
     ],
     "data": ["views/res_config_settings.xml"],
     "installable": True,
