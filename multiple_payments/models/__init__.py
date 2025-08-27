@@ -9,3 +9,4 @@ from . import account_move_line_payment_aggregator
 from . import aggregator_buttons
 from . import aggregator_invoices
 from . import aggregator_helpers
+from . import aggregator_lines
