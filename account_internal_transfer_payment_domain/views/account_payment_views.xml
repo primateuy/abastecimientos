@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <record id="view_account_payment_form_extend_domain" model="ir.ui.view">
+    <field name="name">account.payment.form.extend.domain.for.internal.transfer</field>
+    <field name="model">account.payment</field>
+    <field name="inherit_id" ref="account.view_account_payment_form"/>
+    <field name="arch" type="xml">
+      <xpath expr="//field[@name='payment_method_line_id']" position="attributes">
+        <attribute name="domain">
+          [
+            ("journal_id","=", journal_id),
+            ("payment_type","=", payment_type),
+            "|",
+              ("payment_method_id.code","in", ["manual","in_third_party_checks","new_third_party_checks","out_third_party_checks"]),
+              ("id","in", available_payment_method_line_ids)
+          ]
+        </attribute>
+      </xpath>
+    </field>
+  </record>
+</odoo>
