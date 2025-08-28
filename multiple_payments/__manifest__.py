@@ -1,6 +1,6 @@
 {
     "name": "Multiple Payments",
-    "version": "1.2.2",
+    "version": "1.2.5",
     "author": "Tu Nombre / Empresa",
     "category": 'Accounting/Accounting',
     "depends": ["base","account","l10n_latam_check","l10n_uy"],
@@ -22,11 +22,9 @@
         "views/res_currency_views.xml",
         "views/account_journal_views.xml",
         "views/ir_menu_views.xml",
-        "views/payment_view.xml",
+        "views/payment_view.xml"
         # Reports
     ],
     "installable": True,
     "application": False,
-
-    'version': '16.0.20250827000812'
 }

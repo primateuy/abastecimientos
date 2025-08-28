@@ -118,7 +118,9 @@ class PaymentAggregator(models.Model):
             if len(self.mps_payment_methods_line_ids) == 0:
                 raise ValidationError(_("To make payments you must load the payments in the payment lines."))
 
-           
+            if self.difference != 0:
+                raise ValidationError(_("Difference must be 0 to publish a payments aggregator."))
+
             try:
                 # Recorrer los creditos y/o debitos
                 self._create_invoices_payment()
@@ -136,96 +138,40 @@ class PaymentAggregator(models.Model):
             self.state = "draft"
 
     # Metodo para crear los pagos de las lineas de pago
-    
-    
+    def _create_lines_payment_payments(self):
+        # Lineas de pago
+        for payment_method in self.mps_payment_methods_line_ids:
+            # Tomamos el diario de la linea de pago
+            journal = payment_method.account_journal_id
+            
+            # Validamos
+            if not journal:
+                raise UserError(_("La linea de pago debe contener un diario contable"))
+            
+            # Construimos el diccionario para el pago
+            payment_details = self._get_standard_payment()
+            payment_details['date'] = payment_method["date"]
+            payment_details['amount'] = payment_method["payment_amount"]
+            payment_details['payment_type'] = self["receiptbook_id"]["type"] if not self["receiptbook_id"]["enable_reverse_payment"] else payment_method["payment_type"]
+            payment_details['is_internal_transfer'] = True   # Marcamos
+            payment_details['ref'] = _('Internal Transfer')   # Referencia
+            payment_details['payment_method_id'] = payment_method["payment_method_id"]["id"]
+            
+            # Validar el sentido del talonario para registrar el pago, ya sea saliente o entrante
+            if self.receiptbook_id.type == "outbound":
+                # payment_details['journal_id'] = self.currency_id.account_journal_id.id # Diario origen
+                # payment_details['destination_journal_id'] = journal.id # Diario destino
 
-# === Métodos de botones (stubs seguros) ===
-def button_open_accounting_notes(self):
-    self.ensure_one()
-    return True
+                payment_details['journal_id'] = journal.id # Diario origen
+                payment_details['destination_journal_id'] = self.currency_id.account_journal_id.id,
+            else:
+                payment_details['journal_id'] = journal.id # Diario origen
+                payment_details['destination_journal_id'] = self.currency_id.account_journal_id.id, # Diario destino
+            
+            # Creamos el pago
+            self.create_publish_payment(payment_details)
 
-def button_open_grouped_payments(self):
-    self.ensure_one()
-    return {
-        'type': 'ir.actions.act_window',
-        'name': _('Pagos Agrupados'),
-        'res_model': 'account.payment',
-        'view_mode': 'tree,form',
-        'domain': [('payment_aggregator_id', '=', self.id)],
-        'context': {'group_by': ['transaction_type']},
-    }
-
-def button_update_accounting_notes(self):
-    self.ensure_one()
-    return True
-
-def button_delete_accounting_notes(self):
-    self.ensure_one()
-    return True
-
-def button_apply_fifo(self):
-    self.ensure_one()
-    return True
-
-def button_assign_all(self):
-    self.ensure_one()
-    return True
-
-# === Métodos privados legacy (stubs) ===
-def _delete_accounting_notes(self):
-    self.ensure_one()
-    return True
-
-def _update_accounting_notes(self):
-    self.ensure_one()
-    return True
-
-def _open_accounting_notes(self):
-    self.ensure_one()
-    return True
-
-def _create_lines_payment_payments(self):
-    """
-    Por cada línea de método crea SOLO la transferencia interna OUTBOUND
-    (Odoo crea la contraparte IN automáticamente).
-    - Sin partner
-    - is_internal_transfer=True
-    - partner_type='supplier' (NOT NULL en v16)
-    """
-    for line in self.mps_payment_methods_line_ids:
-        journal = line.account_journal_id
-        if not journal:
-            raise UserError(_("La linea de pago debe contener un diario contable"))
-
-        # Origen/destino y montos
-        if self.receiptbook_id.type == "inbound":
-            origin_journal = self.currency_id.account_journal_id
-            dest_journal = journal
-            origin_currency = self.currency_id
-            origin_amount = line.amount or 0.0
-        else:
-            origin_journal = journal
-            dest_journal = self.currency_id.account_journal_id
-            origin_currency = (line.currency_id or self.company_id.currency_id)
-            origin_amount = line.payment_amount or 0.0
-
-        vals = self._get_standard_payment()
-        vals.update({
-            'date': line.date,
-            'journal_id': origin_journal.id,
-            'is_internal_transfer': True,
-            'destination_journal_id': dest_journal.id,
-            'payment_type': 'outbound',       # correcto v16
-            'partner_id': False,              # sin tercero
-            'partner_type': 'supplier',       # NOT NULL constraint
-            'amount': origin_amount,
-            'currency_id': origin_currency.id,
-            'ref': _('Internal Transfer'),
-            'payment_method_id': line.payment_method_id.id if line.payment_method_id else False,
-        })
-        self.create_publish_payment(vals)
-
-
+    # Metodo para crear el pago a cuenta
     def _create_payment_acount(self):
         if self.payment_account > 0:
             # Armamos los detalles del pago
@@ -294,19 +240,23 @@ def _create_lines_payment_payments(self):
             'payment_method_id': self.env.ref('account.account_payment_method_manual_in').id, # Metodo de pago
             'payment_aggregator_id': self.id
         }
-
-    # Metodo para crear un pago y publicarlo
     
-def create_publish_payment(self, payment_details):
-    """Crear y postear el pago; si existe el helper set_transaction_type, llamarlo."""
-    if not payment_details:
-        raise ValidationError(_("Payments cannot be created with empty information."))
-    payment = self.env['account.payment'].create(payment_details)
-    payment.action_post()
-    if hasattr(payment, 'set_transaction_type'):
-        payment.set_transaction_type()
-    return payment
+    # Metodo para crear un pago y publicarlo
+    def create_publish_payment(self, payment_details):
+        if not payment_details:
+            raise ValidationError(_("Payments cannot be created with empty information."))
+        # Creamos las transferencias internas
+        payment_id = self.env['account.payment'].create(payment_details)
+        # Confirmamos el pago
+        payment_id.action_post()
+        payment_id.set_transaction_type()
+        payment_id.line_ids.payment_aggregator_id = self.id
 
+        # Retornamos el pago
+        return payment_id
+
+    # Se calcula la diferencia
+    @api.depends('amount', 'payment_account', 'debt_allocation')
     def _compute_difference(self):
         for record in self:
             record.difference = record.amount - (record.payment_account + record.debt_allocation)
@@ -315,9 +265,8 @@ def create_publish_payment(self, payment_details):
     def _compute_debt_allocation(self):
         for record in self:
             record.debt_allocation = sum(record.account_move_line_payment_agg_ids.mapped('payment_aggregator_total_import'))
-            total_payments = sum(record.account_move_line_payment_agg_ids.mapped('payment_aggregator_total_import'))
-        for line in record.mps_credits_line_ids:
-            line.total_import = total_payments
+            for credit_line, agg_line in zip(record.mps_credits_line_ids, record.account_move_line_payment_agg_ids):
+                credit_line.total_import = agg_line.payment_aggregator_total_import
 
     
     @api.onchange('customer_id', 'currency_id')
@@ -342,13 +291,14 @@ def create_publish_payment(self, payment_details):
         aggregator_ids = []
         if credit_lines:
             for credit_line in credit_lines:
-                aggregator_record = self.env['account.move.line.payment.aggregator'].create({
-                    'account_move_line_id': credit_line.id,
-                    'move_id': credit_line.move_id.id,
-                    'payment_aggregator_amount_currency': credit_line.amount_currency,
-                    'payment_aggregator_amount_residual': credit_line.amount_residual
-                })
-                aggregator_ids.append(aggregator_record.id)
+                if credit_line.amount_residual != 0 and credit_line.parent_state != 'cancel':
+                    aggregator_record = self.env['account.move.line.payment.aggregator'].create({
+                        'account_move_line_id': credit_line.id,
+                        'move_id': credit_line.move_id.id,
+                        'payment_aggregator_amount_currency': credit_line.amount_currency,
+                        'payment_aggregator_amount_residual': credit_line.amount_residual_currency
+                    })
+                    aggregator_ids.append(aggregator_record.id if aggregator_record.id else aggregator_record.origin)
         self.account_move_line_payment_agg_ids = [(6, 0, aggregator_ids)]
     
     def button_open_accounting_notes(self):
@@ -367,19 +317,40 @@ def create_publish_payment(self, payment_details):
         
     }
     
+    def button_open_grouped_payments(self):
+        self.ensure_one()
+        
+        # Buscar la vista específica si existe
+        view_id = self.env.ref('multiple_payments.view_account_payment_tree_grouped_simple', False)
+        
+        return {
+            'name': 'Pagos Agrupados',
+            'type': 'ir.actions.act_window',
+            'res_model': 'account.payment',
+            'view_mode': 'tree,form',
+            'context': {
+                'group_by': ['transaction_type'],
+                'search_default_partner_id': self.customer_id.id if self.customer_id else False,
+            },
+            'domain': [('payment_aggregator_id', '=', self.id)]
+        }
     
+    def button_update_accounting_notes(self):
+        self.filter_credit_moves()
+        return
     
-def button_open_grouped_payments(self):
-    self.ensure_one()
-    return {
-        'type': 'ir.actions.act_window',
-        'name': _('Pagos Agrupados'),
-        'res_model': 'account.payment',
-        'view_mode': 'tree,form',
-        'domain': [('payment_aggregator_id', '=', self.id)],
-        'context': {'group_by': ['transaction_type']},
-    }
-
+    # Accion del boton de eliminacion de cuentas en 0
+    def button_delete_accounting_notes(self):
+        # Metodo para eliminar los registros donde total_import es 0
+        self._delete_accounting_notes()
+        return
+    
+    def _delete_accounting_notes(self):
+        # Filtrar solo los registros donde total_import es 0
+        lines_to_remove = self.account_move_line_payment_agg_ids.filtered(lambda line: line.payment_aggregator_total_import == 0)
+        # Eliminar solo esas líneas
+        self.write({'account_move_line_payment_agg_ids': [(3, line.id) for line in lines_to_remove]})
+        return True
 
     def button_apply_fifo(self):
         if self.difference > 0 and self.account_move_line_payment_agg_ids:
@@ -411,86 +382,8 @@ def button_open_grouped_payments(self):
         result.name = self.env['ir.sequence'].next_by_code('aggregator.sequence')
         return result
 
-    def button_update_accounting_notes(self):
-        """Stub added to keep legacy buttons working."""
-        self.ensure_one()
-        return True
-
-    def button_delete_accounting_notes(self):
-        """Stub added to keep legacy buttons working."""
-        self.ensure_one()
-        return True
-
-    def _delete_accounting_notes(self):
-        """Legacy stub: no-op to keep buttons working."""
-        self.ensure_one()
-        return True
-
-    def _update_accounting_notes(self):
-        """Legacy stub: no-op to keep buttons working."""
-        self.ensure_one()
-        return True
-
-    def _open_accounting_notes(self):
-        """Legacy stub: no-op to keep buttons working."""
-        self.ensure_one()
-        return True
-
-
-def button_open_accounting_notes(self):
-    self.ensure_one()
-    # Stub para compatibilidad; implementar lógica real si hace falta
-    return True
-
-
-
-def button_open_grouped_payments(self):
-    self.ensure_one()
-    return {
-        'type': 'ir.actions.act_window',
-        'name': _('Pagos Agrupados'),
-        'res_model': 'account.payment',
-        'view_mode': 'tree,form',
-        'domain': [('payment_aggregator_id', '=', self.id)],
-        'context': {'group_by': ['transaction_type']},
-    }
-
-
-
-def button_update_accounting_notes(self):
-    self.ensure_one()
-    # Stub para compatibilidad; implementar lógica real si hace falta
-    return True
-
-
-def button_delete_accounting_notes(self):
-    self.ensure_one()
-    # Stub para compatibilidad; implementar lógica real si hace falta
-    return True
-
-
-def button_apply_fifo(self):
-    self.ensure_one()
-    # Stub para compatibilidad; implementar lógica real si hace falta
-    return True
-
-
-def button_assign_all(self):
-    self.ensure_one()
-    # Stub para compatibilidad; implementar lógica real si hace falta
-    return True
-
-
-def _delete_accounting_notes(self):
-    self.ensure_one()
-    return True
-
-
-def _update_accounting_notes(self):
-    self.ensure_one()
-    return True
-
-
-def _open_accounting_notes(self):
-    self.ensure_one()
-    return True
+    @api.onchange('receiptbook_id')
+    def _validate_recieptbook (self):
+        if self.receiptbook_id.partner_type:
+            if str(self.receiptbook_id.partner_type) not in self.domain_receiptbook_id:
+                raise ValidationError(_(f'You cannot set a {self.receiptbook_id.partner_type.capitalize()} reciept type in this payment aggregator'))

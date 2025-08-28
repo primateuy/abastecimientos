@@ -17,8 +17,6 @@ class MPPaymentMethodsLine(models.Model):
     currency_id = fields.Many2one(
         'res.currency',
         string='currency'
-    ,
-        default=lambda self: self.env.company.currency_id
     )
     payment_aggregator_currency_id = fields.Many2one(
         'res.currency',
@@ -37,6 +35,8 @@ class MPPaymentMethodsLine(models.Model):
         # domain="['|',('type','=','cash'),('type','=','bank'),('currency_id','=',payment_aggregator_currency_id),('intermediate_diary','=',False)]"
         domain="['|',('type','=','cash'),('type','=','bank'),('intermediate_diary','=',False)]"
     )
+    
+    have_journal_currency = fields.Boolean(default=True)
 
     payment_type = fields.Selection([
         ('outbound', 'Outbound'),
@@ -88,31 +88,29 @@ class MPPaymentMethodsLine(models.Model):
     adenda = fields.Char()
 
     # Metodo para asignar el dominio de los metodos de pago
-    
     @api.onchange('account_journal_id')
     def onchange_account_journal_id(self):
-        # Domain y flags base
-        self.payment_method_domain = self._generatePaymentMethodDomain() if not self.account_journal_id else str(self._getPaymentMethodDomain())
-        self._getVisibilityPaymentType()
-        # Moneda del agrupador (recibo)
-        self.payment_aggregator_currency_id = self._getPaymentAggregatorCurrency()
-        # Moneda de la línea (del diario) o moneda de la compañía si el diario no tiene
-        if self.account_journal_id:
-            self.currency_id = self.account_journal_id.currency_id or self.env.company.currency_id
-        else:
-            self.currency_id = self.env.company.currency_id
-        # Mostrar tipo de cambio solo si difieren las monedas
-        if self.currency_id and self.payment_aggregator_currency_id:
-            self.exchange_rate_visibility = (self.currency_id.id != self.payment_aggregator_currency_id.id)
-        else:
-            self.exchange_rate_visibility = False
-        # Recalcular montos
-        try:
-            self.onchange_payment_amount()
-        except Exception:
-            # Evitar romper el onchange en borradores
-            pass
+        if not self.account_journal_id:
+            # Generamos el domain para el metodo de pago
+            self.payment_method_domain = self._generatePaymentMethodDomain()
 
+            # Invocamos el metodo para controlar la visibilidad del tipo de pago
+            self._getVisibilityPaymentType()
+
+            # Asignamos la moneda del agrupador de pago
+            self.payment_aggregator_currency_id = self._getPaymentAggregatorCurrency()
+            self.have_journal_currency = False
+        else:
+            # Establecemos el domain
+            self.payment_method_domain = str(self._getPaymentMethodDomain())
+
+            if not self.account_journal_id.currency_id:
+                self.currency_id = self.env.company.currency_id
+                self.have_journal_currency = False
+
+            if self.account_journal_id.currency_id:
+                self.currency_id = self.account_journal_id.currency_id
+                self.have_journal_currency = True
 
     @api.onchange('currency_id')
     def onchange_currency_id(self):
@@ -142,6 +140,8 @@ class MPPaymentMethodsLine(models.Model):
     def onchange_payment_method_id(self):
         if self.payment_method_id:
             self.is_check = self.payment_method_id.code == "check_printing"
+            if self.is_check:
+                self.check_bank = self.account_journal_id.bank_id.name
     
     # Metodo para obtener la moneda del agrupador pago
     def _getPaymentAggregatorCurrency(self):
