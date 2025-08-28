@@ -1,8 +1,9 @@
 from odoo import _, api, fields, models, tools
-
+from datetime import datetime
 import logging
 _logger = logging.getLogger(__name__)
 
+check_codes = ["new_third_party_checks","in_third_party_checks","check_printing"]
 
 class MPPaymentMethodsLine(models.Model):
 
@@ -32,8 +33,7 @@ class MPPaymentMethodsLine(models.Model):
     account_journal_id = fields.Many2one(
         'account.journal',
         string='Account Journal',
-        # domain="['|',('type','=','cash'),('type','=','bank'),('currency_id','=',payment_aggregator_currency_id),('intermediate_diary','=',False)]"
-        domain="['|',('type','=','cash'),('type','=','bank'),('intermediate_diary','=',False)]"
+        domain=lambda self: str(self._getAccountJournalDomain())
     )
     
     have_journal_currency = fields.Boolean(default=True)
@@ -53,7 +53,7 @@ class MPPaymentMethodsLine(models.Model):
         domain=lambda self: str(self._getPaymentMethodDomain()),
         default=lambda self: self._get_default_payment_method()
     )
-    exchange_rate = fields.Float()
+    exchange_rate = fields.Float(default=1)
     exchange_rate_visibility = fields.Boolean(
         default=False,
         store=False
@@ -117,6 +117,15 @@ class MPPaymentMethodsLine(models.Model):
         if self.currency_id:
             if self.payment_aggregator_currency_id:
                 self.exchange_rate_visibility = self._checkSameCurrency() == False
+                if self.exchange_rate_visibility:
+                    # Obtenemos tasa
+                    currency_rate = self._getCurrencyRate()
+
+                    # Asignamos
+                    if len(currency_rate) > 0:
+                        self.exchange_rate = currency_rate.inverse_company_rate
+                    else:
+                        self.exchange_rate = 1
             
             self.onchange_payment_amount()
 
@@ -139,7 +148,7 @@ class MPPaymentMethodsLine(models.Model):
     @api.onchange('payment_method_id')
     def onchange_payment_method_id(self):
         if self.payment_method_id:
-            self.is_check = self.payment_method_id.code == "check_printing"
+            self.is_check = self.payment_method_id.code in check_codes
             if self.is_check:
                 self.check_bank = self.account_journal_id.bank_id.name
     
@@ -205,3 +214,20 @@ class MPPaymentMethodsLine(models.Model):
         payment_method = self.env['account.payment.method'].search(domain, limit=1)
         
         return payment_method.id if payment_method else False
+
+    # Metodo para obtener el domain para los diarios
+    def _getAccountJournalDomain(self):
+        return ['|',('type','=','cash'),('type','=','bank'),('intermediate_diary','=',False),('company_id','=', self.env.company.id)]
+
+    # Obtenemos la tasa mas actual
+    def _getCurrencyRate(self):
+        # Validamos de donde obtener la moneda
+        if self.currency_id.id == self.env.company.currency_id.id:
+            currency = self.payment_aggregator_currency_id
+        elif self.account_journal_id.currency_id:
+            currency = self.account_journal_id.currency_id
+        else:
+            currency = self.env.company.currency_id
+
+        # Obtenemos tasa
+        return currency.rate_ids.search([('name','<=', datetime.now())], limit=1)

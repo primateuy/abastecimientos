@@ -1,6 +1,6 @@
 {
     "name": "Multiple Payments",
-    "version": "1.2.5",
+    "version": "1.2.6",
     "author": "Tu Nombre / Empresa",
     "category": 'Accounting/Accounting',
     "depends": ["base","account","l10n_latam_check","l10n_uy"],

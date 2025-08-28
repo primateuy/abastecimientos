@@ -169,7 +169,45 @@ class PaymentAggregator(models.Model):
                 payment_details['destination_journal_id'] = self.currency_id.account_journal_id.id, # Diario destino
             
             # Creamos el pago
-            self.create_publish_payment(payment_details)
+            payment = self.create_publish_payment(payment_details)
+
+            # Modificacion de asientos
+            amount = 0
+            exchange_rate = 1
+
+            # Calculamos el monto
+            if payment_method._checkSameCurrency() == False:
+                exchange_rate = payment_method.exchange_rate
+
+                if  self.currency_id.rate > payment_method.currency_id.rate:
+                    amount = payment_method["payment_amount"] * exchange_rate
+                else:
+                    amount = payment_method["payment_amount"] / exchange_rate
+            else:
+                amount = payment_method["payment_amount"]
+
+            # Regresamos la primera transferencia interna a borrador para poder modificar el asiento contable
+            payment.move_id.button_draft()
+
+            # Forzamos los valores de la transferencia interna
+            self._setDebitCreditAmount(payment=payment, amount=amount)
+
+            # Publicamos el asiento contable y con ello se publica el pago
+            payment.move_id.action_post()
+
+            # Buscamos la transferencia interna opuesta
+            mirror_payment = self.env["account.payment"].search([
+                ("paired_internal_transfer_payment_id","=",payment.id),
+            ], limit=1)
+
+            # Regresamos la transferencia interna a borrador para poder modificar el asiento contable
+            mirror_payment.move_id.button_draft()
+
+            # Forzamos los valores de la transferencia interna
+            self._setDebitCreditAmount(payment=mirror_payment, amount=amount)
+            
+            # Publicamos el asiento contable y con ello se publica el pago
+            mirror_payment.move_id.action_post()
 
     # Metodo para crear el pago a cuenta
     def _create_payment_acount(self):
@@ -387,3 +425,27 @@ class PaymentAggregator(models.Model):
         if self.receiptbook_id.partner_type:
             if str(self.receiptbook_id.partner_type) not in self.domain_receiptbook_id:
                 raise ValidationError(_(f'You cannot set a {self.receiptbook_id.partner_type.capitalize()} reciept type in this payment aggregator'))
+            
+    
+    # Metodo para forzar el valor de debito y credito
+    def _setDebitCreditAmount(self, payment, amount):
+        line_ids = []
+        for line in payment.move_id.line_ids:
+            if line.debit == 0:
+                if line.credit != 0:
+                    line_ids.append(
+                        (1,line.id, {
+                            "credit": amount if line.credit > 0 else (amount * -1),
+                            "balance": amount if line.balance > 0 else (amount * -1)
+                        })
+                    )
+            else:
+                line_ids.append(
+                    (1,line.id, {
+                        "debit": amount if line.debit > 0 else (amount * -1),
+                        "balance": amount if line.balance > 0 else (amount * -1),
+                    })
+                )
+        payment.move_id.write({
+            'line_ids': line_ids
+        })
