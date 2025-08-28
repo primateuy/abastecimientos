@@ -35,6 +35,8 @@ class MPPaymentMethodsLine(models.Model):
         # domain="['|',('type','=','cash'),('type','=','bank'),('currency_id','=',payment_aggregator_currency_id),('intermediate_diary','=',False)]"
         domain="['|',('type','=','cash'),('type','=','bank'),('intermediate_diary','=',False)]"
     )
+    
+    have_journal_currency = fields.Boolean(default=True)
 
     payment_type = fields.Selection([
         ('outbound', 'Outbound'),
@@ -97,11 +99,18 @@ class MPPaymentMethodsLine(models.Model):
 
             # Asignamos la moneda del agrupador de pago
             self.payment_aggregator_currency_id = self._getPaymentAggregatorCurrency()
+            self.have_journal_currency = False
         else:
             # Establecemos el domain
             self.payment_method_domain = str(self._getPaymentMethodDomain())
-        if self.account_journal_id and not self.account_journal_id.currency_id:
-            self.currency_id = self.env.company.currency_id
+
+            if not self.account_journal_id.currency_id:
+                self.currency_id = self.env.company.currency_id
+                self.have_journal_currency = False
+
+            if self.account_journal_id.currency_id:
+                self.currency_id = self.account_journal_id.currency_id
+                self.have_journal_currency = True
 
     @api.onchange('currency_id')
     def onchange_currency_id(self):
@@ -131,6 +140,8 @@ class MPPaymentMethodsLine(models.Model):
     def onchange_payment_method_id(self):
         if self.payment_method_id:
             self.is_check = self.payment_method_id.code == "check_printing"
+            if self.is_check:
+                self.check_bank = self.account_journal_id.bank_id.name
     
     # Metodo para obtener la moneda del agrupador pago
     def _getPaymentAggregatorCurrency(self):

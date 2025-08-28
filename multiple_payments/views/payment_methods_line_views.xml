@@ -12,7 +12,8 @@
                     <group>
                         <group>
                             <field name="payment_amount"/>
-                            <field name="currency_id" readonly="1" options="{'no_create': True, 'no_open': True}"/>
+                            <field name="have_journal_currency" invisible="1"/>
+                            <field name="currency_id" readonly="have_journal_currency" options="{'no_create': True, 'no_open': True}" domain="[('active','=',True)]"/>
                             <field name="amount"/>
                             <field name="date"/>
                             <field name="memo"/>

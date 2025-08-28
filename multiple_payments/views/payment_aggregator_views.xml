@@ -72,9 +72,11 @@
                                     <form>
                                         <group>
                                             <group>
-                                                <field name="payment_amount" required="1" string="Payment amount"/>
+                                                <field name="payment_amount" required="1" string="Payment amount"/>                                                
+                                                <field name="have_journal_currency" invisible="1"/>
+                                                <field name="currency_id" readonly="have_journal_currency" options="{'no_create': True, 'no_open': True}" domain="[('active','=',True)]"/>
                                                 <field name="payment_aggregator_currency_id" invisible="1"/>
-                                                <field name="currency_id" readonly='1' options="{'no_create': True}" required="1"/>
+                                                <!-- <field name="currency_id" readonly='1' options="{'no_create': True}" required="1"/> -->
                                                 <field name="amount" required="1"/>
                                                 <field name="date" required="1"/>
                                                 <field name="memo"/>
