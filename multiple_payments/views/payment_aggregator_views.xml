@@ -62,7 +62,7 @@
                                 <field name="mps_payment_methods_line_ids" context="{'receiptbook_id': receiptbook_id, 'currency_id':currency_id}" readonly="state == 'published'" invisible="not receiptbook_id or not currency_id">
                                     <tree>
                                         <field name="date"/>
-                                        <field name="account_journal_id"/>
+                                        <field name="account_journal_id" />
                                         <field name="payment_type"/>
                                         <field name="currency_id"/>
                                         <field name="payment_amount"/>
@@ -83,7 +83,14 @@
                                                 <field name="adenda"/>
                                             </group>
                                             <group>
-                                                <field name="account_journal_id" options="{'no_create': True}" required="1"/>
+                                                <field name="account_journal_id"
+                                                       options="{'no_create': True}" required="1"
+                                                       domain="[('company_id','in', allowed_company_ids),
+                                                                ('type','in',('bank','cash')),
+                                                                ('intermediate_diary','=', False),
+                                                                '|',
+                                                                  ('currency_id','=', currency_id),
+                                                                    ('company_id.currency_id','=?', currency_id)]"/>
                                                 <field name="payment_type_visibility" invisible="1"/>
                                                 <field name="payment_type" widget="radio" options="{'horizontal': true}" invisible="not payment_type_visibility"/>
                                                 <field name="payment_method_id" options="{'no_create': True}" domain="payment_method_domain" invisible="not account_journal_id" required="1"/>
