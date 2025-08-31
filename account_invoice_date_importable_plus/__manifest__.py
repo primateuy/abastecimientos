@@ -1,7 +1,7 @@
 {
     "name": "Account Move Invoice Date Importable (robusto)",
-    "version": "17",
-    "author": "aiglesas - Primate Uy",
+    "version": "17.0",
+    "author": "iglesias-andres - Primate Uy",
     "category": "Accounting",
     "license": "LGPL-3",
     "depends": ["account", "base_import"],
