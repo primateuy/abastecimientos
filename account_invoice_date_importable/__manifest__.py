@@ -1,6 +1,6 @@
 {
     "name": "Account Move Invoice Date Importable",
-    "version": "17.0",
+    "version": "17.0.1",
     "author": "igleisas-andres - Primate Uy",
     "category": "Accounting",
     "license": "LGPL-3",
