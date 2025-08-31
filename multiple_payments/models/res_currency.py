@@ -7,7 +7,7 @@ class ResCurrency(models.Model):
     account_journal_id = fields.Many2one(
         'account.journal',
         string='Account Journal',
-        domain="['|',('type','=','cash'),('type','=','bank')]"
+        domain=lambda self: str(self._getAccountJournalDomain())
     )
 
     @api.onchange('accout_journal_id')
@@ -15,3 +15,7 @@ class ResCurrency(models.Model):
         if self.account_journal_id:
             if self.account_journal_id.intermediate_diary == False:
                 self.account_journal_id.intermediate_diary = True
+
+    # Metodo para obtener el domain para los diarios
+    def _getAccountJournalDomain(self):
+        return ['|',('type','=','cash'),('type','=','bank'),('intermediate_diary','=',True),('company_id','=', self.env.company.id)]
