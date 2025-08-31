@@ -1,6 +1,6 @@
 {
     "name": "Multiple Payments",
-    "version": "1.2.6",
+    "version": "1.2.7",
     "author": "Tu Nombre / Empresa",
     "category": 'Accounting/Accounting',
     "depends": ["base","account","l10n_latam_check","l10n_uy"],
@@ -19,10 +19,10 @@
         # Views
         "views/payment_aggregator_views.xml",
         "views/receipt_books_views.xml",
-        "views/res_currency_views.xml",
         "views/account_journal_views.xml",
+        "views/payment_view.xml",
+        "views/account_journal_aggregator_views.xml",
         "views/ir_menu_views.xml",
-        "views/payment_view.xml"
         # Reports
     ],
     "installable": True,

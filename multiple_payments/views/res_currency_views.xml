@@ -5,15 +5,7 @@
         <field name="inherit_id" ref="base.view_currency_form" />
         <field name="arch" type="xml">
             <xpath expr="//field[@name='full_name']" position="after">
-<field name="account_journal_id"
-       options="{'no_create': True}"
-       domain="[('company_id','in', allowed_company_ids),
-                ('type','in',('cash','bank')),
-                ('intermediate_diary','=',True),
-                '|',
-                  ('currency_id','=', id),
-                  '&amp;', ('currency_id','=', False), ('company_id.currency_id','=', id)
-               ]"/>
+                <field name="account_journal_id" options="{'no_create': True}"/>
             </xpath>
         </field>
     </record>

@@ -53,5 +53,13 @@
             parent="account.menu_finance_payables"
             sequence="5"
         />
+
+        <!-- Diarios intermedios -->
+        <menuitem
+            id="account_intermediate_journal_menu"
+            name="Intermediate diary"
+            action="account_journal_aggregator_view_action"
+            parent="payment_aggregator_parent_menu"
+            sequence="1"/>
     </data>
 </odoo>

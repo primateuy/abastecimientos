@@ -43,8 +43,11 @@
                         <group>
                             <group>
                                 <field name="customer_id" readonly="state == 'published'" options="{'no_create': True, 'no_open': True}"/>
+                                <field name="company_id" readonly="1"/>
                                 <field name="date" readonly="state == 'published'"/>
-                                <field name="currency_id" options="{'no_create': True}" readonly="state == 'published'"/>
+                                <field name="account_journals_currency_ids" invisible="1"/>
+                                <field name="currency_id" options="{'no_create': True}" required="1" readonly="state == 'published'"/>
+                                <field name="account_journal_aggregator_id" readonly="state == 'published'" invisible="1"/>
                                 <field name="domain_receiptbook_id" invisible="1"/>
                                 <field name="receiptbook_id" domain="domain_receiptbook_id" readonly="state == 'published'" options="{'no_create': False}"/>
                                 <field name="adenda" readonly="state == 'published'"/>
@@ -62,7 +65,7 @@
                                 <field name="mps_payment_methods_line_ids" context="{'receiptbook_id': receiptbook_id, 'currency_id':currency_id}" readonly="state == 'published'" invisible="not receiptbook_id or not currency_id">
                                     <tree>
                                         <field name="date"/>
-                                        <field name="account_journal_id" />
+                                        <field name="account_journal_id"/>
                                         <field name="payment_type"/>
                                         <field name="currency_id"/>
                                         <field name="payment_amount"/>
@@ -72,7 +75,7 @@
                                     <form>
                                         <group>
                                             <group>
-                                                <field name="payment_amount" required="1" string="Payment amount"/>                                                
+                                                <field name="payment_amount" required="1" string="Payment amount"/>
                                                 <field name="have_journal_currency" invisible="1"/>
                                                 <field name="currency_id" readonly="have_journal_currency" options="{'no_create': True, 'no_open': True}" domain="[('active','=',True)]"/>
                                                 <field name="payment_aggregator_currency_id" invisible="1"/>
@@ -83,26 +86,24 @@
                                                 <field name="adenda"/>
                                             </group>
                                             <group>
-                                                <field name="account_journal_id"
-                                                       options="{'no_create': True}" required="1"
-                                                       domain="[('company_id','in', allowed_company_ids),
-                                                                ('type','in',('bank','cash')),
-                                                                ('intermediate_diary','=', False),
-                                                                '|',
-                                                                  ('currency_id','=', currency_id),
-                                                                    ('company_id.currency_id','=?', currency_id)]"/>
+                                                <field name="account_journal_id" options="{'no_create': True}" required="1"/>
                                                 <field name="payment_type_visibility" invisible="1"/>
                                                 <field name="payment_type" widget="radio" options="{'horizontal': true}" invisible="not payment_type_visibility"/>
-                                                <field name="payment_method_id" options="{'no_create': True}" domain="payment_method_domain" invisible="not account_journal_id" required="1"/>
+                                                <field name="payment_method_id" options="{'no_create': True}" domain="payment_method_domain" invisible="1"/>
+                                                <field name="payment_method_line_id" options="{'no_create': True}" domain="payment_method_domain" invisible="not account_journal_id" required="1"/>
                                                 <field name="payment_method_domain" invisible="1"/>
+                                                <field name="payment_method_code" invisible="1"/>
                                                 <field name="exchange_rate_visibility" invisible="1"/>
                                                 <field name="exchange_rate" invisible="not exchange_rate_visibility"/>
                                                 
                                                 <field name="is_check" invisible="1"/>
-                                                <field name="check_number" invisible="not is_check" required="is_check"/>
-                                                <field name="check_cash_date" invisible="not is_check" required="is_check"/>
-                                                <field name="check_bank" invisible="not is_check" required="is_check"/>
-                                                <field name="check_vat" invisible="not is_check" required="is_check"/>
+                                                <field name="company_id" invisible="1"/>
+                                                <field name="check_number" invisible="payment_method_code != 'new_third_party_checks'" required="is_check"/>
+                                                <field name="check_cash_date" invisible="payment_method_code != 'new_third_party_checks'" required="is_check"/>
+                                                <field name="check_bank_id" invisible="payment_method_code != 'new_third_party_checks'" required="is_check"/>
+                                                <field name="check_vat" invisible="payment_method_code != 'new_third_party_checks'" required="is_check"/>
+                                                <field name="check_id" domain="check_domain" invisible="payment_method_code != 'out_third_party_checks'" required="is_check"/>
+                                                <field name="check_domain" invisible="1"/>
                                             </group>
                                         </group>
                                     </form>
