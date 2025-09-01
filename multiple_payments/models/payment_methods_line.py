@@ -58,16 +58,20 @@ class MPPaymentMethodsLine(models.Model):
         'account.payment.method.line',
         compute='_compute_payment_method_line_fields'
     )
-    payment_method_line_id = fields.Many2one('account.payment.method.line', string='Payment Method',
-        readonly=False, store=True, copy=False,
+    payment_method_line_id = fields.Many2one(
+        'account.payment.method.line', 
+        string='Payment Method',
+        readonly=False, 
+        store=True, 
+        copy=False,
         compute='_compute_payment_method_line_id',
-        domain=lambda self: "[('id', 'in', %s)]" % self.available_payment_method_line_ids,
         help="Manual: Pay or Get paid by any method outside of Odoo.\n"
         "Payment Providers: Each payment provider has its own Payment Method. Request a transaction on/to a card thanks to a payment token saved by the partner when buying or subscribing online.\n"
         "Check: Pay bills by check and print it from Odoo.\n"
         "Batch Deposit: Collect several customer checks at once generating and submitting a batch deposit to your bank. Module account_batch_payment is necessary.\n"
         "SEPA Credit Transfer: Pay in the SEPA zone by submitting a SEPA Credit Transfer file to your bank. Module account_sepa is necessary.\n"
-        "SEPA Direct Debit: Get paid in the SEPA zone thanks to a mandate your partner will have granted to you. Module account_sepa is necessary.\n")
+        "SEPA Direct Debit: Get paid in the SEPA zone thanks to a mandate your partner will have granted to you. Module account_sepa is necessary.\n"
+    )
     exchange_rate = fields.Float(default=1)
     exchange_rate_visibility = fields.Boolean(
         default=False,
@@ -122,12 +126,14 @@ class MPPaymentMethodsLine(models.Model):
     @api.onchange('account_journal_id')
     def onchange_account_journal_id(self):
         if not self.account_journal_id:
-            self.payment_method_domain = "[('id', 'in', %s), ('payment_method_id.code', '!=', 'in_third_party_checks')]" % self.available_payment_method_line_ids.ids
+            self.payment_method_domain = "[]"
             self._getVisibilityPaymentType()
             self.payment_aggregator_currency_id = self._getPaymentAggregatorCurrency()
             self.have_journal_currency = False
         else:
-            self.payment_method_domain = "[('id', 'in', %s), ('payment_method_id.code', '!=', 'in_third_party_checks')]" % self.available_payment_method_line_ids.ids
+            # Calcular métodos de pago disponibles
+            self._compute_payment_method_line_fields()
+            self.payment_method_domain = "[('id', 'in', %s), ('payment_method_id.code', '!=', 'in_third_party_checks')]" % (self.available_payment_method_line_ids.ids or [])
 
             if not self.account_journal_id.currency_id:
                 self.currency_id = self.env.company.currency_id
@@ -244,14 +250,17 @@ class MPPaymentMethodsLine(models.Model):
             else:
                 pay.payment_method_line_id = False
 
-    @api.depends('payment_type', 'account_journal_id', 'currency_id')
+    @api.depends('payment_type', 'account_journal_id')
     def _compute_payment_method_line_fields(self):
         for pay in self:
             if pay.account_journal_id:
-                pay.available_payment_method_line_ids = pay.account_journal_id._get_available_payment_method_lines(pay.payment_type)
-                to_exclude = pay._get_payment_method_codes_to_exclude()
-                if to_exclude:
-                    pay.available_payment_method_line_ids = pay.available_payment_method_line_ids.filtered(lambda x: x.code not in to_exclude)
+                try:
+                    pay.available_payment_method_line_ids = pay.account_journal_id._get_available_payment_method_lines(pay.payment_type)
+                    to_exclude = pay._get_payment_method_codes_to_exclude()
+                    if to_exclude:
+                        pay.available_payment_method_line_ids = pay.available_payment_method_line_ids.filtered(lambda x: x.code not in to_exclude)
+                except:
+                    pay.available_payment_method_line_ids = self.env['account.payment.method.line']
             else:
                 pay.available_payment_method_line_ids = self.env['account.payment.method.line']
 
