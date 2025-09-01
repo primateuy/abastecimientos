@@ -1103,11 +1103,17 @@ class PaymentAggregator(models.Model):
            
             # mirror_payment._multiple_payments_action_post()
             # self.env.cr.execute("UPDATE account_payment SET currency_id = %s WHERE id = %s;" % (self.currency_id.id, int(payment.id)))
-            account_account = self.env["account.journal"].search([('type', '=', 'purchase')], limit=1)
-            payment.write({
-                "partner_type": self.receiptbook_id.partner_type,
-                "account_journal_id": account_account.id
-            })
+
+            if self.receiptbook_id.partner_type == "customer":
+                payment.write({
+                    "partner_type": self.receiptbook_id.partner_type
+                })
+            else:
+                account_account = self.env["account.journal"].search([('type', '=', 'purchase')], limit=1)
+                payment.write({
+                    "partner_type": self.receiptbook_id.partner_type,
+                    "account_journal_id": account_account.id
+                })
 
             _logger.info(payment)
             _logger.info(payment.partner_type)
