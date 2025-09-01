@@ -11,7 +11,12 @@ class PaymentAggregator(models.Model):
 
     # Campos básicos
     name = fields.Char(required=True, default="Borrador")
-    company_id = fields.Many2one('res.company', string='company')
+    company_id = fields.Many2one(
+        'res.company', 
+        string='company',
+        default=lambda self: self.env.company,
+        required=True
+    )
     currency_id = fields.Many2one(
         'res.currency', 
         string='currency', 
@@ -438,7 +443,9 @@ class PaymentAggregator(models.Model):
 
     @api.model
     def create(self, values):
-        values['company_id'] = self.env.company.id
+        # Asegurar que company_id siempre esté presente
+        if not values.get('company_id'):
+            values['company_id'] = self.env.company.id
         result = super().create(values)
         result.name = self.env['ir.sequence'].next_by_code('aggregator.sequence')
         return result
