@@ -144,6 +144,18 @@ class AccountPayment(models.Model):
             return self._create_paired_internal_transfer_payment_mps()
         else:
             return super()._create_paired_internal_transfer_payment()
+        
+    def action_post(self):
+        _logger.info("========= Antes del action_post ============")
+        _logger.info(self.currency_id)
+        _logger.info(self.currency_id.name)
+
+        super().action_post()
+
+        _logger.info("========= Despues del action_post ============")
+
+        _logger.info(self.currency_id)
+        _logger.info(self.currency_id.name)
 
     def _create_paired_internal_transfer_payment_mps(self):
         """
@@ -183,7 +195,7 @@ class AccountPayment(models.Model):
                 })
                 
                 # Crear asiento usando método personalizado COMPATIBLE
-                paired_payment.move_create_custom(payment)
+                # paired_payment.move_create_custom(payment)
                 paired_payment.move_id._post(soft=False)
                 payment.paired_internal_transfer_payment_id = paired_payment
                 

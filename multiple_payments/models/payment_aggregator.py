@@ -1005,6 +1005,10 @@ class PaymentAggregator(models.Model):
             #     "currency_id": self.currency_id.id
             # })
 
+            _logger.info(payment)
+            _logger.info(payment.currency_id)
+            _logger.info(payment.currency_id.name)
+
 
             # Modificación de asientos con fechas correctas
             amount = payment_method["amount"]
@@ -1017,10 +1021,11 @@ class PaymentAggregator(models.Model):
             )
 
             # CORREGIR FECHAS
-            self._fix_payment_dates(payment, payment_date)
+            # self._fix_payment_dates(payment, payment_date)
            
             # Publicamos el asiento
-            payment.move_id._post(soft=False)
+            # payment.move_id._post(soft=False)
+            payment.action_post()
             # payment._create_paired_internal_transfer_payment()
 
             # payment.paired_internal_transfer_payment_id.write({
@@ -1096,7 +1101,11 @@ class PaymentAggregator(models.Model):
             # )
            
             # mirror_payment._multiple_payments_action_post()
-            self.env.cr.execute("UPDATE account_payment SET currency_id = %s WHERE id = %s;" % (self.currency_id.id, int(payment.id)))
+            # self.env.cr.execute("UPDATE account_payment SET currency_id = %s WHERE id = %s;" % (self.currency_id.id, int(payment.id)))
+
+            _logger.info(payment)
+            _logger.info(payment.currency_id)
+            _logger.info(payment.currency_id.name)
 
     def _create_payment_acount(self):
         if self.payment_account > 0:
@@ -1357,6 +1366,7 @@ class PaymentAggregator(models.Model):
         if line_ids:
             payment.move_id.write({'line_ids': line_ids})
        
+        _logger.info(payment.currency_id.name)
         _logger.info("Updated payment %s with amounts: payment_currency=%.2f, company_currency=%.2f",
                      payment.name, amount_in_payment_currency, amount_company_currency)
 
