@@ -55,11 +55,11 @@
         />
 
         <!-- Diarios intermedios -->
-        <menuitem
+        <!-- <menuitem
             id="account_intermediate_journal_menu"
             name="Intermediate diary"
             action="account_journal_aggregator_view_action"
             parent="payment_aggregator_parent_menu"
-            sequence="1"/>
+            sequence="1"/> -->
     </data>
 </odoo>

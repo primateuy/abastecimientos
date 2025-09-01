@@ -1,45 +1,5 @@
 <odoo>
     <data>
-        <record id="account_payment_inherit_mps_form" model="ir.ui.view">
-            <field name="name">account.payment.form</field>
-            <field name="model">account.payment</field>
-            <field name="inherit_id" ref="account.view_account_payment_form" />
-            <field name="arch" type="xml">
-                <xpath expr="//group[@name='main_group']//label[@for='is_internal_transfer']" position="after">
-                     <!-- <group name="main_group">
-                            <group name="group1">
-                                <label for="is_internal_transfer"/> -->
-                    <field name="payment_aggregator_id"/>
-                    <field name="is_internal_transfer_mps" invisible="not payment_aggregator_id"/>
-                </xpath>
-
-                <xpath expr="//group[@name='main_group']//field[@name='partner_id']" position="after">
-                    <field name="partner_mps_id" context="{'default_is_company': True}" string="Customer" options="{'no_quick_create': True}" invisible="partner_type != 'customer' or not payment_aggregator_id" readonly="state != 'draft'"/>
-                    <field name="partner_mps_id" context="{'default_is_company': True}" string="Vendor" options="{'no_quick_create': True}" invisible="partner_type != 'supplier' or not payment_aggregator_id" readonly="state != 'draft'"/>
-                </xpath>
-
-                <xpath expr="//field[@name='payment_type']" position="after">
-                    <field name="payment_type_mps" widget="radio" options="{'horizontal': True}" readonly="state != 'draft'" invisible="not payment_aggregator_id"/>
-                </xpath>
-
-                <xpath expr="//field[@name='date']" position="after">
-                    <field name="date_mps" readonly="state != 'draft'"/>
-                </xpath>
-
-                <xpath expr="//field[@name='l10n_latam_check_id']" position="after">
-                    <field name="l10n_latam_check_mps_id" readonly="state != 'draft'"/>
-                </xpath>
-<!-- 
-                <xpath expr="//group[@name='main_group']//field[@name='partner_id'][@invisible='partner_type != 'supplier' or is_internal_transfer']" position="attributes">
-                    <attribute name="invisible">partner_type != 'customer' or is_internal_transfer and not payment_aggregator_id or payment_aggregator_id</attribute>
-                </xpath>
-
-                <xpath expr="//group[@name='main_group']//field[@name='partner_id'][@invisible='partner_type != 'supplier' or is_internal_transfer']" position="attributes">
-                    <attribute name="invisible">partner_type != 'customer' or is_internal_transfer and not payment_aggregator_id or payment_aggregator_id</attribute>
-                </xpath> -->
-            </field>
-        </record>
-
         <!-- Tree para los pagos agrupados -->
         <record id="account_payment_multiple_payments_group_view_tree" model="ir.ui.view">
             <field name="name">account.payment.multiple.payments.group.tree</field>

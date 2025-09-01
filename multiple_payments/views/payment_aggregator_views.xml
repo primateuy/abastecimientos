@@ -111,6 +111,13 @@
                             </page>
                             <page name="credits" string="Outstanding Credits/Debits">
                                 <button 
+                                    name="button_reconciliate_payments" 
+                                    type="object"
+                                    string="Concialite" 
+                                    class="oe_highlight fa m-1" 
+                                    invisible="state == 'draft'"
+                                />
+                                <button 
                                     name="button_open_accounting_notes" 
                                     type="object"
                                     string="Open Accounting Notes" 
