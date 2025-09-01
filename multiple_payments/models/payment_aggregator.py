@@ -1324,16 +1324,16 @@ class PaymentAggregator(models.Model):
         # Calcular el monto en moneda de la empresa
         date = payment.date or fields.Date.today()
        
-        if payment_currency.id == company_currency.id:
-            amount_company_currency = amount_in_payment_currency
-        else:
+        # if payment_currency.id == company_currency.id:
+        #     amount_company_currency = amount_in_payment_currency
+        # else:
             # amount_company_currency = payment_currency._convert(
             #     amount_in_payment_currency,
             #     company_currency,
             #     self.env.company,
             #     date
             # )
-            amount_company_currency = payment_method["payment_amount"]
+        amount_company_currency = payment_method["payment_amount"]
        
         line_ids = []
         for line in payment.move_id.line_ids:
