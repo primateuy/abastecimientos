@@ -1038,39 +1038,39 @@ class PaymentAggregator(models.Model):
             # CORREGIR FECHAS EN TRANSFERENCIA ESPEJO
             # self._fix_payment_dates(payment.paired_internal_transfer_payment_id, payment_date)
 
-            check_id = False
+            # check_id = False
 
-            if payment_method["is_check"] == False:
-                pass
-                # self.env.cr.execute("UPDATE account_payment SET is_internal_transfer = %s, partner_id = '%s' WHERE id = %s;" % (True, self.customer_id.id, int(payment.id)))
-            else:
-                # Creamos el cheque con fecha correcta
-                check_id = self.env["account.payment"].create({
-                    "payment_type": payment_method["payment_type"],
-                    "partner_id": self.customer_id.id,
-                    "amount": payment_method["payment_amount"],
-                    "amount_destino": payment_method["payment_amount"],
-                    "date": payment_date,  # FECHA CORRECTA
-                    "date_mps": payment_date,
-                    "journal_id": journal.id,
-                    "payment_method_line_id": payment_method["payment_method_line_id"]["id"],
-                    "l10n_latam_check_number": payment_method["check_number"],
-                    "l10n_latam_check_payment_date": payment_method["check_cash_date"],
-                    "l10n_latam_check_bank_id": payment_method["check_bank_id"]["id"],
-                    "l10n_latam_check_issuer_vat": payment_method["check_vat"],
-                    "l10n_latam_check_current_journal_id": self.account_journal_aggregator_id.account_journal_id.id,
-                    "is_internal_transfer": False
-                })
+            # if payment_method["is_check"] == False:
+            #     pass
+            #     # self.env.cr.execute("UPDATE account_payment SET is_internal_transfer = %s, partner_id = '%s' WHERE id = %s;" % (True, self.customer_id.id, int(payment.id)))
+            # else:
+            #     # Creamos el cheque con fecha correcta
+            #     check_id = self.env["account.payment"].create({
+            #         "payment_type": payment_method["payment_type"],
+            #         "partner_id": self.customer_id.id,
+            #         "amount": payment_method["payment_amount"],
+            #         "amount_destino": payment_method["payment_amount"],
+            #         "date": payment_date,  # FECHA CORRECTA
+            #         "date_mps": payment_date,
+            #         "journal_id": journal.id,
+            #         "payment_method_line_id": payment_method["payment_method_line_id"]["id"],
+            #         "l10n_latam_check_number": payment_method["check_number"],
+            #         "l10n_latam_check_payment_date": payment_method["check_cash_date"],
+            #         "l10n_latam_check_bank_id": payment_method["check_bank_id"]["id"],
+            #         "l10n_latam_check_issuer_vat": payment_method["check_vat"],
+            #         "l10n_latam_check_current_journal_id": self.account_journal_aggregator_id.account_journal_id.id,
+            #         "is_internal_transfer": False
+            #     })
 
-                check_id.write({
-                    "l10n_latam_check_bank_id": payment_method["check_bank_id"]["id"],
-                })
+            #     check_id.write({
+            #         "l10n_latam_check_bank_id": payment_method["check_bank_id"]["id"],
+            #     })
 
-                check_id.action_post()
+            #     check_id.action_post()
 
-                payment.write({
-                    "l10n_latam_check_mps_id": check_id.id
-                })
+            #     payment.write({
+            #         "l10n_latam_check_mps_id": check_id.id
+            #     })
 
             # Resto del código de transferencias internas igual...
             # mirror_payment = payment.paired_internal_transfer_payment_id
