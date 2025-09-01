@@ -141,7 +141,6 @@ class PaymentAggregator(models.Model):
             # _logger.info(account_journals)
             return [('id','in', account_journals.mapped("currency_id.id"))]
 
-    # Cambiar estatus del registro
     def button_change_state(self):
         if self.state == "draft":
         
@@ -153,22 +152,193 @@ class PaymentAggregator(models.Model):
                 raise ValidationError(_("Difference must be 0 to publish a payments aggregator."))
             
             try:
-                # PASO 1: Recorrer los creditos y/o debitos (pagos de facturas)
-                self._create_invoices_payment()
-
-                # PASO 2: Crear los pagos de los metodos de pago
-                self._create_lines_payment_payments_v2()
-
-                # PASO 3: Crear pago a cuenta SOLO si no se creó ya en los métodos de pago
-                # Verificamos si hay payment_account pero no hay métodos de pago que lo cubran
-                if self.payment_account > 0:
-                    self._create_payment_account_if_needed()
+                has_invoices = len(self.account_move_line_payment_agg_ids) > 0
+                has_payment_methods = len(self.mps_payment_methods_line_ids) > 0
+                has_payment_account = self.payment_account > 0
+                
+                if has_invoices and has_payment_methods:
+                    # CASO MIXTO: Facturas + Métodos de pago específicos
+                    # SALTEAR diario intermedio y crear todo directo en métodos
+                    _logger.info("Caso mixto detectado: creando pagos directos en métodos específicos")
+                    self._create_mixed_payments()
+                    
+                elif has_invoices and not has_payment_methods:
+                    # CASO 1: Solo facturas (sin métodos específicos)
+                    # Usar diario intermedio tradicional
+                    _logger.info("Solo facturas: usando diario intermedio")
+                    self._create_invoices_payment()
+                    if has_payment_account:
+                        self._create_payment_account_if_needed_with_invoices()
+                        
+                else:
+                    # CASO 2: Solo pago a cuenta (sin facturas)
+                    # Crear pagos directos en métodos de pago
+                    _logger.info("Solo pago a cuenta: creando pagos directos")
+                    self._create_lines_payment_payments_v2()
 
             except Exception as e:
                 raise UserError(str(e))
             self.state = "published"
         else:
             self.state = "draft"
+
+    def _create_mixed_payments(self):
+        """
+        CASO MIXTO: Crear pagos que incluyan tanto facturas como pago a cuenta
+        directamente en los métodos de pago específicos (saltear diario intermedio)
+        """
+        total_invoice_amount = sum(self.account_move_line_payment_agg_ids.mapped('payment_aggregator_total_import'))
+        total_payment_account = self.payment_account or 0
+        total_to_distribute = total_invoice_amount + total_payment_account
+        
+        _logger.info(f"Distribuyendo total de ${total_to_distribute} en {len(self.mps_payment_methods_line_ids)} métodos")
+        
+        for payment_method in self.mps_payment_methods_line_ids:
+            journal = payment_method.account_journal_id
+            
+            if not journal:
+                raise UserError(_("La linea de pago debe contener un diario contable"))
+            
+            try:
+                # Buscar método de pago apropiado
+                if self.receiptbook_id.type == "inbound":
+                    method_line = journal.inbound_payment_method_line_ids.filtered(
+                        lambda m: m.id == payment_method.payment_method_line_id.id
+                    )[:1]
+                    if not method_line:
+                        method_line = journal.inbound_payment_method_line_ids.filtered(
+                            lambda m: m.payment_method_id.code == 'manual'
+                        )[:1] or journal.inbound_payment_method_line_ids[:1]
+                    payment_type = 'inbound'
+                else:
+                    method_line = journal.outbound_payment_method_line_ids.filtered(
+                        lambda m: m.id == payment_method.payment_method_line_id.id
+                    )[:1]
+                    if not method_line:
+                        method_line = journal.outbound_payment_method_line_ids.filtered(
+                            lambda m: m.payment_method_id.code == 'manual'
+                        )[:1] or journal.outbound_payment_method_line_ids[:1]
+                    payment_type = 'outbound'
+                
+                if not method_line:
+                    raise UserError(f"No hay métodos de pago disponibles para el diario {journal.name}")
+                
+                # Crear referencia detallada para casos mixtos
+                ref_parts = []
+                if total_invoice_amount > 0:
+                    ref_parts.append(f"Invoices: ${total_invoice_amount}")
+                if total_payment_account > 0:
+                    ref_parts.append(f"Account: ${total_payment_account}")
+                ref = f"Mixed Payment {self.name}: {' + '.join(ref_parts)}"
+                
+                # CREAR PAGO DIRECTO EN MÉTODO ESPECÍFICO
+                payment_vals = {
+                    'payment_type': payment_type,
+                    'partner_type': self.receiptbook_id.partner_type,
+                    'partner_id': self.customer_id.id,
+                    'amount': payment_method.payment_amount,  # MONTO ORIGINAL DEL MÉTODO
+                    'currency_id': payment_method.currency_id.id,  # MONEDA ORIGINAL
+                    'date': payment_method.date,
+                    'ref': ref,
+                    'journal_id': journal.id,  # DIARIO ORIGINAL DEL MÉTODO
+                    'payment_method_line_id': method_line.id,
+                    'is_internal_transfer': False,
+                    'payment_aggregator_id': self.id,
+                }
+                
+                # CAMPOS DE CHEQUES si aplica
+                if payment_method.is_check:
+                    payment_vals.update({
+                        'l10n_latam_check_number': payment_method.check_number,
+                        'l10n_latam_check_payment_date': payment_method.check_cash_date,
+                        'l10n_latam_check_bank_id': payment_method.check_bank_id.id,
+                        'l10n_latam_check_issuer_vat': payment_method.check_vat,
+                        'l10n_latam_check_current_journal_id': journal.id,
+                    })
+                
+                # CREAR Y PUBLICAR PAGO
+                payment = self.env['account.payment'].create(payment_vals)
+                payment.action_post()
+                
+                if payment.move_id:
+                    payment.move_id.line_ids.write({'payment_aggregator_id': self.id})
+                
+                _logger.info(f"Pago mixto creado: {payment.name} - ${payment.amount} {payment.currency_id.name}")
+                
+            except Exception as e:
+                error_msg = f"Error creando pago mixto para {journal.name}: {str(e)}"
+                _logger.error(error_msg)
+                raise UserError(error_msg)
+        
+        # RECONCILIAR FACTURAS con los pagos creados (si las hay)
+        if len(self.account_move_line_payment_agg_ids) > 0:
+            self._reconcile_invoices_with_mixed_payments()
+
+    def _reconcile_invoices_with_mixed_payments(self):
+        """
+        Reconciliar facturas con los pagos mixtos creados directamente en métodos
+        """
+        _logger.info("Iniciando reconciliación de facturas con pagos mixtos")
+        
+        # Obtener todos los pagos creados para este agrupador
+        payments_created = self.env['account.payment'].search([
+            ('payment_aggregator_id', '=', self.id),
+            ('is_internal_transfer', '=', False)
+        ])
+        
+        for credit_line in self.account_move_line_payment_agg_ids:
+            if credit_line.payment_aggregator_total_import > 0:
+                try:
+                    # Buscar líneas de pago que puedan reconciliar con esta factura
+                    for payment in payments_created:
+                        payment_lines = payment.line_ids.filtered(
+                            lambda line: line.account_id.account_type in ['asset_receivable', 'liability_payable'] 
+                            and not line.reconciled
+                        )
+                        invoice_lines = credit_line.move_id.line_ids.filtered(
+                            lambda line: line.account_id.account_type in ['asset_receivable', 'liability_payable'] 
+                            and not line.reconciled
+                        )
+                        
+                        if payment_lines and invoice_lines:
+                            # Reconciliar parcialmente
+                            (invoice_lines + payment_lines).reconcile()
+                            _logger.info(f"Reconciliada factura {credit_line.move_id.name} con pago {payment.name}")
+                            break
+                            
+                except Exception as e:
+                    _logger.warning(f"Error reconciliando {credit_line.move_id.name}: {str(e)}")
+                    continue
+
+    def _create_payment_account_if_needed_with_invoices(self):
+        """
+        Para casos con facturas: crear pago a cuenta en diario intermedio
+        (no se duplica porque los métodos de pago NO se crean en este flujo)
+        """
+        if self.payment_account > 0:
+            payment_details = self._get_standard_payment_compatible()
+            payment_details['amount'] = self.payment_account
+            payment_details['amount_destino'] = self.payment_account
+            payment_details['ref'] = f'Payment on account: {self.name}'
+
+            if self.receiptbook_id.type == "inbound":
+                payment_method_line = self.account_journal_aggregator_id.account_journal_id.inbound_payment_method_line_ids.filtered(
+                    lambda pay: pay.payment_method_id.id == self.env.ref("account.account_payment_method_manual_in").id
+                )
+            else:
+                payment_method_line = self.account_journal_aggregator_id.account_journal_id.outbound_payment_method_line_ids.filtered(
+                    lambda pay: pay.payment_method_id.id == self.env.ref("account.account_payment_method_manual_out").id
+                )
+            
+            payment_details["payment_method_line_id"] = payment_method_line.id
+            payment_details["payment_method_id"] = payment_method_line.payment_method_id.id
+
+            payment = self.create_publish_payment(payment_details)
+            payment.set_transaction_type()
+            payment.move_id.write({"date": payment_details["date"]})
+            payment.action_post()
+            
+            _logger.info(f"Pago a cuenta con facturas creado: {self.payment_account}")
 
     def _create_payment_account_if_needed(self):
         """
