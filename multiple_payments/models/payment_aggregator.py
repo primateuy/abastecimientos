@@ -415,7 +415,7 @@ class PaymentAggregator(models.Model):
                     'partner_type': self.receiptbook_id.partner_type,
                     'partner_id': self.customer_id.id,
                     'amount': assigned_amount,  # MONTO EXACTO ASIGNADO
-                    'currency_id': payment_method.currency_id.id,  # MONEDA DEL MÉTODO
+                    'currency_id': self.currency_id.id,  # MONEDA DEL MÉTODO
                     'date': payment_method.date or self.date,
                     'ref': f'Invoice Payment: {credit_line.move_id.name} - {self.name}',
                     'journal_id': journal.id,  # DIARIO DEL MÉTODO DIRECTAMENTE
