@@ -144,7 +144,7 @@ class PaymentAggregator(models.Model):
     # Cambiar estatus del registro
     def button_change_state(self):
         if self.state == "draft":
-           
+        
             # Validamos pagos
             if len(self.mps_payment_methods_line_ids) == 0:
                 raise ValidationError(_("To make payments you must load the payments in the payment lines."))
@@ -153,23 +153,69 @@ class PaymentAggregator(models.Model):
                 raise ValidationError(_("Difference must be 0 to publish a payments aggregator."))
             
             try:
-                # Recorrer los creditos y/o debitos
+                # PASO 1: Recorrer los creditos y/o debitos (pagos de facturas)
                 self._create_invoices_payment()
 
-                # Validamos si tiene pago a cuenta para realizar el pago
-                self._create_payment_acount()
-
-                # Crear los pagos de los metodos de pago
-                # self._create_lines_payment_payments()
+                # PASO 2: Crear los pagos de los metodos de pago
                 self._create_lines_payment_payments_v2()
 
-                # self._create_intermediate_transfers()
+                # PASO 3: Crear pago a cuenta SOLO si no se creó ya en los métodos de pago
+                # Verificamos si hay payment_account pero no hay métodos de pago que lo cubran
+                if self.payment_account > 0:
+                    self._create_payment_account_if_needed()
 
             except Exception as e:
-                raise UserError(e)
+                raise UserError(str(e))
             self.state = "published"
         else:
             self.state = "draft"
+
+    def _create_payment_account_if_needed(self):
+        """
+        Crear pago a cuenta SOLO si no fue cubierto por los métodos de pago
+        Esto evita duplicación cuando es un pago a cuenta puro
+        """
+        # Calcular el total de métodos de pago en moneda del agrupador
+        total_methods_amount = sum(method.amount for method in self.mps_payment_methods_line_ids)
+        
+        # Si el total de métodos de pago cubre exactamente el pago a cuenta,
+        # significa que es un pago a cuenta puro y NO debe crearse otro pago
+        if abs(total_methods_amount - self.payment_account) < 0.01:  # Margen para decimales
+            _logger.info(f"Pago a cuenta de {self.payment_account} ya cubierto por métodos de pago. No se crea pago adicional.")
+            return
+        
+        # Solo crear pago a cuenta adicional si hay diferencia
+        remaining_payment_account = self.payment_account - total_methods_amount
+        
+        if remaining_payment_account > 0.01:  # Solo si hay monto restante significativo
+            self._create_additional_payment_account(remaining_payment_account)
+
+    def _create_additional_payment_account(self, amount):
+        """
+        Crear pago a cuenta adicional solo por el monto no cubierto por métodos de pago
+        """
+        payment_details = self._get_standard_payment_compatible()
+        payment_details['amount'] = amount
+        payment_details['amount_destino'] = amount
+
+        if self.receiptbook_id.type == "inbound":
+            payment_method_line = self.account_journal_aggregator_id.account_journal_id.inbound_payment_method_line_ids.filtered(
+                lambda pay: pay.payment_method_id.id == self.env.ref("account.account_payment_method_manual_in").id
+            )
+        else:
+            payment_method_line = self.account_journal_aggregator_id.account_journal_id.outbound_payment_method_line_ids.filtered(
+                lambda pay: pay.payment_method_id.id == self.env.ref("account.account_payment_method_manual_out").id
+            )
+        
+        payment_details["payment_method_line_id"] = payment_method_line.id
+        payment_details["payment_method_id"] = payment_method_line.payment_method_id.id
+
+        payment = self.create_publish_payment(payment_details)
+        payment.set_transaction_type()
+        payment.move_id.write({"date": payment_details["date"]})
+        payment.action_post()
+        
+        _logger.info(f"Pago a cuenta adicional creado: {amount}")
 
     def _create_lines_payment_payments_v2(self):
         """
