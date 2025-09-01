@@ -1,6 +1,6 @@
 <odoo>
     <data>
-        <!-- Formulario -->
+        <!-- Formulario ACTUALIZADO -->
         <record id="payment_aggregator_views_form" model="ir.ui.view">
             <field name="name">mps.payment.aggregator.view.form</field>
             <field name="model">mps.payment.aggregator</field>
@@ -79,7 +79,6 @@
                                                 <field name="have_journal_currency" invisible="1"/>
                                                 <field name="currency_id" readonly="have_journal_currency" options="{'no_create': True, 'no_open': True}" domain="[('active','=',True)]"/>
                                                 <field name="payment_aggregator_currency_id" invisible="1"/>
-                                                <!-- <field name="currency_id" readonly='1' options="{'no_create': True}" required="1"/> -->
                                                 <field name="amount" required="1"/>
                                                 <field name="date" required="1"/>
                                                 <field name="memo"/>
@@ -98,11 +97,12 @@
                                                 
                                                 <field name="is_check" invisible="1"/>
                                                 <field name="company_id" invisible="1"/>
+                                                <!-- CAMPOS DE CHEQUE CORREGIDOS -->
                                                 <field name="check_number" invisible="payment_method_code != 'new_third_party_checks'" required="is_check"/>
                                                 <field name="check_cash_date" invisible="payment_method_code != 'new_third_party_checks'" required="is_check"/>
-                                                <field name="check_bank_id" invisible="payment_method_code != 'new_third_party_checks'" required="is_check"/>
+                                                <field name="check_bank_id" invisible="payment_method_code != 'new_third_party_checks'" required="is_check" options="{'no_create': True}"/>
                                                 <field name="check_vat" invisible="payment_method_code != 'new_third_party_checks'" required="is_check"/>
-                                                <field name="check_id" domain="check_domain" invisible="payment_method_code != 'out_third_party_checks'" required="is_check"/>
+                                                <field name="check_id" domain="check_domain" invisible="payment_method_code != 'out_third_party_checks'" required="payment_method_code == 'out_third_party_checks'"/>
                                                 <field name="check_domain" invisible="1"/>
                                             </group>
                                         </group>
@@ -118,14 +118,6 @@
                                     icon="fa-line-chart"
                                     invisible="state == 'draft'"
                                 />
-                                <!-- <button 
-                                    name="button_open_grouped_payments" 
-                                    type="object"
-                                    string="Open Grouped Payments" 
-                                    class="oe_highlight fa m-1" 
-                                    icon="fa-line-chart"
-                                    invisible="state == 'draft'"
-                                /> -->
                                 <button 
                                     name="button_update_accounting_notes" 
                                     type="object"
@@ -193,15 +185,13 @@
             </field>
         </record>
 
-        <!-- Action -->
-        <!-- General -->
+        <!-- Actions -->
         <record id="payments_aggregator_view_action" model="ir.actions.act_window">
             <field name="name">Payments Aggregator</field>
             <field name="res_model">mps.payment.aggregator</field>
             <field name="view_mode">tree,form</field>
         </record>
 
-        <!-- Customers -->
         <record id="payments_aggregator_customers_view_action" model="ir.actions.act_window">
             <field name="name">Payments Aggregator - Customers</field>
             <field name="res_model">mps.payment.aggregator</field>
@@ -212,7 +202,6 @@
             }</field>
         </record>
 
-        <!-- Suppliers -->
         <record id="payments_aggregator_suppliers_view_action" model="ir.actions.act_window">
             <field name="name">Payments Aggregator - Suppliers</field>
             <field name="res_model">mps.payment.aggregator</field>

@@ -1,106 +1,36 @@
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError, ValidationError
 from datetime import datetime
-from odoo.addons.account.models.account_payment import AccountPayment
 import logging
+
 _logger = logging.getLogger(__name__)
 
 class PaymentAggregator(models.Model):
-
     _name = 'mps.payment.aggregator'
     _description = 'Model to save payment aggregator'
 
+    # Campos básicos
     name = fields.Char(required=True, default="Borrador")
-    company_id = fields.Many2one(
-        'res.company',
-        string='company',
-    )
-    currency_id = fields.Many2one(
-        'res.currency',
-        string='currency',
-        domain="[('id','=',account_journals_currency_ids)]",
-        required=False
-    )
-    account_journal_aggregator_id = fields.Many2one(
-        'account.journal.aggregator',
-        string='Intermediate diary',
-        required=True,
-        domain=lambda self: "[('company_id','=', %s),('currency_id','=',currency_id)]" % self.env.company.id
-    )
-
-    account_journals_currency_ids = fields.Many2many(
-        'res.currency', 
-        domain=lambda self: str(self._get_account_journals_currency_domain()),
-        compute="_get_account_journals_currency_domain_compute"
-    )
-
-    state = fields.Selection([
-        ('draft', 'Draft'),
-        ('published','Published')
-    ],default="draft")
-
-    # talonario
-    receiptbook_id = fields.Many2one(
-        "mps.receipt.books",
-        required=True
-    )
-
-    # domain para el talonario
+    company_id = fields.Many2one('res.company', string='company')
+    currency_id = fields.Many2one('res.currency', string='currency', domain="[('id','=',account_journals_currency_ids)]", required=False)
+    account_journal_aggregator_id = fields.Many2one('account.journal.aggregator', string='Intermediate diary', required=True, domain=lambda self: "[('company_id','=', %s),('currency_id','=',currency_id)]" % self.env.company.id)
+    account_journals_currency_ids = fields.Many2many('res.currency', domain=lambda self: str(self._get_account_journals_currency_domain()), compute="_get_account_journals_currency_domain_compute")
+    state = fields.Selection([('draft', 'Draft'), ('published','Published')], default="draft")
+    receiptbook_id = fields.Many2one("mps.receipt.books", required=True)
     domain_receiptbook_id = fields.Char(default="[('is_public','=',True)]")
-
-    # cliente o empresa
-    customer_id = fields.Many2one(
-        'res.partner',
-        string='customer',
-        required=True
-    )
-
+    customer_id = fields.Many2one('res.partner', string='customer', required=True)
     adenda = fields.Char(string="Adenda")
-
     date = fields.Date(required=True)
-
-    # importe
-    amount = fields.Monetary(
-        currency_field="currency_id",
-        compute="_compute_amount"
-    )
-
-    # pago a cuenta
-    payment_account = fields.Monetary(
-        currency_field="currency_id"
-    )
-
-    # asignacion de deuda
-    debt_allocation = fields.Monetary(
-        currency_field="currency_id",
-        compute="_compute_debt_allocation"
-    )
-
-    # Diferencia
-    difference = fields.Monetary(
-        currency_field="currency_id",
-        compute="_compute_difference"
-    )
-
-    # Metodos de pago
-    mps_payment_methods_line_ids = fields.One2many(
-        'mps.payment.methods.line', 
-        'mps_payment_aggregator_id'
-    )
-
-    # apuntes contables
-    mps_credits_line_ids = fields.Many2many(
-        'account.move.line', 
-        string='Cuentas por Pagar/Cobrar',
-    )
+    amount = fields.Monetary(currency_field="currency_id", compute="_compute_amount")
+    payment_account = fields.Monetary(currency_field="currency_id")
+    debt_allocation = fields.Monetary(currency_field="currency_id", compute="_compute_debt_allocation")
+    difference = fields.Monetary(currency_field="currency_id", compute="_compute_difference")
+    mps_payment_methods_line_ids = fields.One2many('mps.payment.methods.line', 'mps_payment_aggregator_id')
+    mps_credits_line_ids = fields.Many2many('account.move.line', string='Cuentas por Pagar/Cobrar')
     average_rate = fields.Float(compute='_compute_average_rate')
+    account_move_line_payment_agg_ids = fields.One2many('account.move.line.payment.aggregator', 'payment_aggregator_id')
 
-    account_move_line_payment_agg_ids = fields.One2many(
-        'account.move.line.payment.aggregator',
-        'payment_aggregator_id' 
-    )
-
-    # Se suma los montos de los metodos de pago
+    # Métodos compute existentes
     @api.depends('average_rate')
     def _compute_average_rate(self):
         payment_lines = self.mps_payment_methods_line_ids
@@ -109,329 +39,22 @@ class PaymentAggregator(models.Model):
         else: 
             self.average_rate = 0
 
-
-    # Se suma los montos de los metodos de pago
     @api.depends('amount')
     def _compute_amount(self):
         for record in self:
             record.amount = sum(self.mps_payment_methods_line_ids.mapped("amount"))
 
-    # Si el adenda se cambia, se lo agregamos a los metodos de pago 
     @api.onchange('adenda')
     def onchange_adenda(self):
-        if self.adenda:
-            if len(self.mps_payment_methods_line_ids) > 0:
-                for method in self.mps_payment_methods_line_ids:
-                    method.adenda = self.adenda
-    
-    # Metodo computado para buscar los ids de las monedas aceptables
-    @api.depends('account_journals_currency_ids')
-    def _get_account_journals_currency_domain_compute(self):
-        for record in self:
-            record.account_journals_currency_ids = self.env["res.currency"].search(record._get_account_journals_currency_domain()).ids
+        if self.adenda and len(self.mps_payment_methods_line_ids) > 0:
+            for method in self.mps_payment_methods_line_ids:
+                method.adenda = self.adenda
 
-    @api.onchange('account_journals_currency_ids')
-    def onchange_account_journals_currency_ids(self):
-        self._get_account_journals_currency_domain_compute()
-
-    # Metodo para obtener el domain de los diarios intermedios
-    def _get_account_journals_currency_domain(self):
-        for record in self:
-            account_journals = record.env["account.journal.aggregator"].search([("company_id","=", self.env.company.id)])
-            # _logger.info(account_journals)
-            return [('id','in', account_journals.mapped("currency_id.id"))]
-
-    # Cambiar estatus del registro
-    def button_change_state(self):
-        if self.state == "draft":
-           
-            # Validamos pagos
-            if len(self.mps_payment_methods_line_ids) == 0:
-                raise ValidationError(_("To make payments you must load the payments in the payment lines."))
-
-            if self.difference != 0:
-                raise ValidationError(_("Difference must be 0 to publish a payments aggregator."))
-            
-            try:
-                # Recorrer los creditos y/o debitos
-                self._create_invoices_payment()
-
-                # Validamos si tiene pago a cuenta para realizar el pago
-                self._create_payment_acount()
-
-                # Crear los pagos de los metodos de pago
-                self._create_lines_payment_payments()
-
-            except Exception as e:
-                raise UserError(e)
-            self.state = "published"
-        else:
-            self.state = "draft"
-
-    # Metodo para crear los pagos de las lineas de pago
-    def _create_lines_payment_payments(self):
-        # Lineas de pago
-        for payment_method in self.mps_payment_methods_line_ids:
-            # Tomamos el diario de la linea de pago
-            journal = payment_method.account_journal_id
-            
-            # Validamos
-            if not journal:
-                raise UserError(_("La linea de pago debe contener un diario contable"))
-            
-            # Construimos el diccionario para el pago
-            payment_details = self._get_standard_payment()
-            payment_details['date'] = payment_method["date"]
-            payment_details['amount'] = payment_method["payment_amount"]
-            payment_details['amount_destino'] = payment_method["payment_amount"]
-            # payment_details['payment_type'] = self["receiptbook_id"]["type"] if not self["receiptbook_id"]["enable_reverse_payment"] else payment_method["payment_type"]
-            payment_details['payment_type'] = payment_method["payment_type"]
-            payment_details['is_internal_transfer'] = True   # Marcamos
-            payment_details['ref'] = _('Internal Transfer')   # Referencia
-            payment_details['payment_method_line_id'] = payment_method["payment_method_line_id"]["id"]
-            payment_details['payment_method_id'] = payment_method["payment_method_line_id"]["payment_method_id"]["id"]
-            payment_details['transaction_type'] = "internal_transfer"
-            if payment_method["is_check"]:
-                payment_details['l10n_latam_check_number'] = payment_method["check_number"]
-                payment_details['l10n_latam_check_payment_date'] = payment_method["check_cash_date"]
-                payment_details['l10n_latam_check_bank_id'] = payment_method["check_bank_id"]["id"]
-                payment_details['l10n_latam_check_issuer_vat'] = payment_method["check_vat"]
-                payment_details['l10n_latam_check_current_journal_id'] = journal.id
-
-            # Validar el sentido del talonario para registrar el pago, ya sea saliente o entrante
-            if self.receiptbook_id.type == "outbound":
-
-                payment_details['journal_id'] = journal.id # Diario origen
-                payment_details['destination_journal_id'] = self.account_journal_aggregator_id.account_journal_id.id,
-            else:
-                
-                payment_details['journal_id'] = journal.id # Diario origen
-                payment_details['destination_journal_id'] = self.account_journal_aggregator_id.account_journal_id.id, # Diario destino
-            
-            # _logger.info(payment_details)
-            # Creamos el pago
-            payment = self.create_publish_payment(payment_details)
-
-            # Modificacion de asientos
-            amount = 0
-            exchange_rate = 1
-
-            # Calculamos el monto
-            if payment_method._checkSameCurrency() == False:
-                exchange_rate = payment_method.exchange_rate
-
-                if  self.currency_id.rate > payment_method.currency_id.rate:
-                    amount = payment_method["payment_amount"] * exchange_rate
-                else:
-                    amount = payment_method["payment_amount"] / exchange_rate
-            else:
-                amount = payment_method["payment_amount"]
-
-            # payment.write({
-            #     **payment_details,
-            #     "is_internal_transfer": True
-            # })
-            # _logger.info("=======")
-            # _logger.info(payment)
-            # _logger.info(self.env.user.company_ids)
-            # Regresamos la primera transferencia interna a borrador para poder modificar el asiento contable
-            # payment.move_id.button_draft()
-
-            # Forzamos los valores de la transferencia interna
-            self._setDebitCreditAmount(payment=payment, amount=amount)
-
-            # Publicamos el asiento
-            payment.move_id._post(soft=False)
-            payment._create_paired_internal_transfer_payment()
-
-            # _logger.info("payment publicado")
-            # _logger.info(payment.state)
-            # _logger.info(payment.move_id.state)
-            # _logger.info("paired_internal_transfer_payment_id")
-            # _logger.info(payment.paired_internal_transfer_payment_id)
-
-            check_id = False
-
-            if payment_method["is_check"] == False:
-                self.env.cr.execute("UPDATE account_payment SET is_internal_transfer = %s, partner_id = '%s' WHERE id = %s;" % (True, self.customer_id.id, int(payment.id)))
-            else:
-
-                # Creamos el cheque
-                check_id = self.env["account.payment"].create({
-                    "payment_type": payment_method["payment_type"],
-                    "partner_id": self.customer_id.id,
-                    "amount": payment_method["payment_amount"],
-                    "amount_destino": payment_method["payment_amount"],
-                    "date": payment_method["date"],
-                    "journal_id": journal.id,
-                    "payment_method_line_id": payment_method["payment_method_line_id"]["id"],
-                    "l10n_latam_check_number": payment_method["check_number"],
-                    "l10n_latam_check_payment_date": payment_method["check_cash_date"],
-                    "l10n_latam_check_bank_id": payment_method["check_bank_id"]["id"],
-                    "l10n_latam_check_issuer_vat": payment_method["check_vat"],
-                    "l10n_latam_check_current_journal_id": self.account_journal_aggregator_id.account_journal_id.id,
-                    "is_internal_transfer": False
-                })
-
-                check_id.write({
-                    "l10n_latam_check_bank_id": payment_method["check_bank_id"]["id"],
-                })
-
-                check_id.action_post()
-
-                # Actualizamos la tabla por query
-                self.env.cr.execute(
-                    "UPDATE account_payment " \
-                    "SET is_internal_transfer = %s, " \
-                    "partner_id = %s, " \
-                    "l10n_latam_check_bank_id = %s, " \
-                    "l10n_latam_check_current_journal_id = %s, " \
-                    "l10n_latam_check_id = %s WHERE id = %s;" % (
-                        True, 
-                        self.customer_id.id,
-                        payment_method["check_bank_id"]["id"],
-                        self.account_journal_aggregator_id.account_journal_id.id,
-                        check_id.id,
-                        int(payment.id)
-                    )
-                )
-
-                # _logger.info(payment.l10n_latam_check_id)
-
-            # Buscamos la transferencia interna opuesta
-            mirror_payment = payment.paired_internal_transfer_payment_id
-
-            # _logger.info(mirror_payment)
-
-            if payment_method["is_check"] == False:
-                self.env.cr.execute("UPDATE account_payment SET is_internal_transfer = %s, partner_id = %s WHERE paired_internal_transfer_payment_id = %s;" % (True, self.customer_id.id, int(payment.id)))
-            else:
-                self.env.cr.execute(
-                    "UPDATE account_payment " \
-                    "SET is_internal_transfer = %s, " \
-                    "partner_id = %s, " \
-                    "l10n_latam_check_id = %s " \
-                    "WHERE paired_internal_transfer_payment_id = %s;" % (True, self.customer_id.id, check_id.id, int(payment.id)))
-
-            # Regresamos la transferencia interna a borrador para poder modificar el asiento contable
-            mirror_payment.move_id.button_draft()
-
-            # Forzamos los valores de la transferencia interna
-            self._setDebitCreditAmount(payment=mirror_payment, amount=amount)
-            
-            # Publicamos el asiento contable y con ello se publica el pago
-            mirror_payment._multiple_payments_action_post()
-
-
-    # Metodo para crear el pago a cuenta
-    def _create_payment_acount(self):
-        if self.payment_account > 0:
-            # Armamos los detalles del pago
-            payment_details = self._get_standard_payment()
-
-            # Modificamos el monto a pagar
-            payment_details['amount'] = self.payment_account
-
-            if self.receiptbook_id.type == "inbound":
-                payment_method_line = self.account_journal_aggregator_id.account_journal_id.inbound_payment_method_line_ids.filtered(
-                    lambda pay: pay.payment_method_id.id == self.env.ref("account.account_payment_method_manual_in").id
-                )
-            else:
-                payment_method_line = self.account_journal_aggregator_id.account_journal_id.outbound_payment_method_line_ids.filtered(
-                    lambda pay: pay.payment_method_id.id == self.env.ref("account.account_payment_method_manual_out").id
-                )
-            # _logger.info("==================")
-            # _logger.info("_create_payment_acount")
-            # _logger.info(payment_method_line)
-            payment_details["payment_method_line_id"] = payment_method_line.id
-            payment_details["payment_method_id"] = payment_method_line.payment_method_id.id
-
-            # Creamos el pago
-            payment = self.create_publish_payment(payment_details)
-            payment.set_transaction_type()
-            payment.action_post()
-
-    # Metodo para recorrer los apuntes contables y marcar como pagados
-    def _create_invoices_payment(self):
-        if self.account_move_line_payment_agg_ids:
-            # Borramos las deudas que tengan importe 0
-            self._delete_accounting_notes()
-
-            # Si todavia hay deudas por pagar
-            if len(self.account_move_line_payment_agg_ids) > 0:
-                # Recorrer los creditos y/o debitos
-                for credit_line in self.account_move_line_payment_agg_ids:
-                    # Armamos los detalles del pago
-                    payment_details = self._get_standard_payment()
-
-                    # Modificamos los campos necesarios
-                    payment_details["amount"] = credit_line.payment_aggregator_total_import  # Monto a pagar
-                    # payment_details["reconciled_invoice_ids"] = [(6,0,[credit_line.move_id.id])], # Se asigna la factura al pago
-                    payment_details["ref"] = credit_line.move_id.name # Nombre de referencia
-
-                    # Creamos el pago
-                    move_id = self.create_publish_payment(payment_details)
-
-                    # Invocamos el metodo para reconciliar el estatus del pago
-                    move_id.set_transaction_type()
-                    move_id.action_post()
-                    move_id._compute_reconciliation_status()
-
-                    # Obtenemos los apuntes contables del pago
-                    payment_lines = move_id.line_ids.filtered(
-                        lambda line: line.account_id.account_type in ['asset_receivable', 'liability_payable'] and not line.reconciled
-                    )
-                    # Obtenemos los apuntes contables de la factura
-                    invoice_lines = credit_line.move_id.line_ids.filtered(
-                        lambda line: line.account_id.account_type in ['asset_receivable', 'liability_payable'] and not line.reconciled
-                    )
-                    # Unimos en una sola lista del mismo modelo e invocamos el metodo reconcile para 
-                    # reconciliar el pago de la factura
-                    (invoice_lines + payment_lines).reconcile()
-
-                    # Marcamos los pagos como matches
-                    for payment_line in payment_lines:
-                        if payment_line.move_id.payment_id:
-                            payment_line.move_id.payment_id.is_matched = True
-
-                    # Invocamos el metodo que comprueba si la factura puede pasar a pagada
-                    credit_line.move_id._compute_payment_state()
-
-    # Metodo para obtener el diccionario estandar para registrar un pago
-    def _get_standard_payment(self):
-        return {
-            'partner_id': self.customer_id.id,   # Cliente
-            'date': self.date,                   # Fecha del pago    
-            'amount': 0,                         # Monto a pagar
-            'is_internal_transfer': False,       # Si es transferencia
-            'payment_type': self.receiptbook_id.type,  # Tipo de pago segun el talonario
-            'journal_id': self.account_journal_aggregator_id.account_journal_id.id, # Diario intermedio
-            'partner_type': self.receiptbook_id.partner_type, # Si es cliente o si es proveedor
-            # 'payment_method_id': self.env.ref('account.account_payment_method_manual_in').id, # Metodo de pago
-            'payment_aggregator_id': self.id
-        }
-    
-    # Metodo para crear un pago y publicarlo
-    def create_publish_payment(self, payment_details):
-        # Validamos que no se creen pagos vacios
-        if not payment_details:
-            raise ValidationError(_("Payments cannot be created with empty information."))
-        # Validamos el diario destino
-        if "destination_journal_id" in payment_details:
-            payment_details["currency_destino_id"] = payment_details["destination_journal_id"][0]
-        # Creamos las transferencias internas
-        payment_id = self.env['account.payment'].create(payment_details)
-        # payment_id.set_transaction_type()
-        payment_id.line_ids.payment_aggregator_id = self.id
-        # Retornamos el pago
-        return payment_id
-
-    # Se calcula la diferencia
     @api.depends('amount', 'payment_account', 'debt_allocation')
     def _compute_difference(self):
         for record in self:
             record.difference = record.amount - (record.payment_account + record.debt_allocation)
-    # Calculamos debt_allocation automáticamente cuando cambian las líneas
+
     @api.depends('account_move_line_payment_agg_ids.payment_aggregator_total_import')
     def _compute_debt_allocation(self):
         for record in self:
@@ -439,12 +62,319 @@ class PaymentAggregator(models.Model):
             for credit_line, agg_line in zip(record.mps_credits_line_ids, record.account_move_line_payment_agg_ids):
                 credit_line.total_import = agg_line.payment_aggregator_total_import
 
+    # MÉTODO PRINCIPAL COMPLETAMENTE REESCRITO
+    def button_change_state(self):
+        if self.state == "draft":
+            # Validaciones
+            if not self.mps_payment_methods_line_ids:
+                raise ValidationError(_("To make payments you must load the payments in the payment lines."))
+            if self.difference != 0:
+                raise ValidationError(_("Difference must be 0 to publish a payments aggregator."))
+            
+            try:
+                # Nuevo flujo simplificado
+                self._create_invoice_payments()
+                self._create_payment_on_account()
+                self._create_internal_transfers()
+                self.state = "published"
+            except Exception as e:
+                _logger.error(f"Error processing payment aggregator: {e}")
+                raise UserError(str(e))
+
+    def _create_invoice_payments(self):
+        """Crear pagos por facturas/deudas pendientes"""
+        if not self.account_move_line_payment_agg_ids:
+            return
+        
+        # Eliminar líneas con importe 0
+        self._delete_accounting_notes()
+        
+        intermediate_journal = self.account_journal_aggregator_id.account_journal_id
+        
+        for credit_line in self.account_move_line_payment_agg_ids:
+            if credit_line.payment_aggregator_total_import <= 0:
+                continue
+                
+            payment_vals = {
+                'partner_id': self.customer_id.id,
+                'date': self.date,  # FECHA CORREGIDA
+                'amount': credit_line.payment_aggregator_total_import,
+                'payment_type': self.receiptbook_id.type,
+                'partner_type': self.receiptbook_id.partner_type,
+                'journal_id': intermediate_journal.id,
+                'currency_id': self.currency_id.id,
+                'ref': f"{self.adenda or ''} - {credit_line.move_id.name}".strip(' -'),
+                'payment_aggregator_id': self.id,
+                'transaction_type': 'customer_payment' if self.receiptbook_id.partner_type == 'customer' else 'vendor_payment'
+            }
+            
+            # Obtener método de pago por defecto
+            payment_method_line = self._get_default_payment_method_line(intermediate_journal, self.receiptbook_id.type)
+            if payment_method_line:
+                payment_vals.update({
+                    'payment_method_line_id': payment_method_line.id,
+                    'payment_method_id': payment_method_line.payment_method_id.id
+                })
+            
+            payment = self.env['account.payment'].create(payment_vals)
+            payment.action_post()
+            
+            # Reconciliar con la factura
+            self._reconcile_payment_with_invoice(payment, credit_line)
+
+    def _create_payment_on_account(self):
+        """Crear pago a cuenta si existe"""
+        if self.payment_account <= 0:
+            return
+            
+        intermediate_journal = self.account_journal_aggregator_id.account_journal_id
+        
+        payment_vals = {
+            'partner_id': self.customer_id.id,
+            'date': self.date,  # FECHA CORREGIDA
+            'amount': self.payment_account,
+            'payment_type': self.receiptbook_id.type,
+            'partner_type': self.receiptbook_id.partner_type,
+            'journal_id': intermediate_journal.id,
+            'currency_id': self.currency_id.id,
+            'ref': f"{self.adenda or ''} - Pago a cuenta".strip(' -'),
+            'payment_aggregator_id': self.id,
+            'transaction_type': 'customer_payment' if self.receiptbook_id.partner_type == 'customer' else 'vendor_payment'
+        }
+        
+        payment_method_line = self._get_default_payment_method_line(intermediate_journal, self.receiptbook_id.type)
+        if payment_method_line:
+            payment_vals.update({
+                'payment_method_line_id': payment_method_line.id,
+                'payment_method_id': payment_method_line.payment_method_id.id
+            })
+        
+        payment = self.env['account.payment'].create(payment_vals)
+        payment.action_post()
+
+    def _create_internal_transfers(self):
+        """Crear transferencias internas SIMPLIFICADAS"""
+        intermediate_journal = self.account_journal_aggregator_id.account_journal_id
+        
+        for method_line in self.mps_payment_methods_line_ids:
+            self._create_single_internal_transfer(method_line, intermediate_journal)
+
+    def _create_single_internal_transfer(self, method_line, intermediate_journal):
+        """Crear una transferencia interna individual CORREGIDA"""
+        method_journal = method_line.account_journal_id
+        
+        # Importes correctos
+        amount_method_currency = method_line.payment_amount
+        amount_aggregator_currency = method_line.amount
+        
+        # Sentido de transferencia
+        if self.receiptbook_id.type == 'inbound':  # Recibir dinero
+            origin_journal = method_journal
+            destination_journal = intermediate_journal
+            origin_payment_type = 'outbound'
+            destination_payment_type = 'inbound'
+            origin_amount = amount_method_currency
+            destination_amount = amount_aggregator_currency
+        else:  # Enviar dinero
+            origin_journal = intermediate_journal
+            destination_journal = method_journal
+            origin_payment_type = 'outbound'
+            destination_payment_type = 'inbound'
+            origin_amount = amount_aggregator_currency
+            destination_amount = amount_method_currency
+
+        # Crear pago origen
+        origin_payment_vals = {
+            'partner_id': self.customer_id.id,  # PARTNER CORREGIDO
+            'date': self.date,  # FECHA CORREGIDA
+            'amount': origin_amount,
+            'payment_type': origin_payment_type,
+            'partner_type': 'supplier',
+            'journal_id': origin_journal.id,
+            'currency_id': origin_journal.currency_id.id or self.env.company.currency_id.id,
+            'is_internal_transfer': True,
+            'ref': f"{method_line.adenda or self.adenda or ''} - Transferencia".strip(' -'),
+            'payment_aggregator_id': self.id,
+            'transaction_type': 'internal_transfer'
+        }
+        
+        # Campos de cheque CORREGIDOS
+        if method_line.is_check:
+            check_fields = self._get_check_fields(method_line)
+            origin_payment_vals.update(check_fields)
+        
+        origin_method_line = self._get_default_payment_method_line(origin_journal, origin_payment_type)
+        if origin_method_line:
+            origin_payment_vals.update({
+                'payment_method_line_id': origin_method_line.id,
+                'payment_method_id': origin_method_line.payment_method_id.id
+            })
+
+        origin_payment = self.env['account.payment'].create(origin_payment_vals)
+
+        # Crear pago destino
+        destination_payment_vals = {
+            'partner_id': self.customer_id.id,  # PARTNER CORREGIDO
+            'date': self.date,  # FECHA CORREGIDA
+            'amount': destination_amount,
+            'payment_type': destination_payment_type,
+            'partner_type': 'customer',
+            'journal_id': destination_journal.id,
+            'currency_id': destination_journal.currency_id.id or self.env.company.currency_id.id,
+            'is_internal_transfer': True,
+            'ref': f"{method_line.adenda or self.adenda or ''} - Transferencia".strip(' -'),
+            'payment_aggregator_id': self.id,
+            'transaction_type': 'internal_transfer'
+        }
+
+        destination_method_line = self._get_default_payment_method_line(destination_journal, destination_payment_type)
+        if destination_method_line:
+            destination_payment_vals.update({
+                'payment_method_line_id': destination_method_line.id,
+                'payment_method_id': destination_method_line.payment_method_id.id
+            })
+
+        destination_payment = self.env['account.payment'].create(destination_payment_vals)
+
+        # Vincular transferencias
+        origin_payment.write({
+            'paired_internal_transfer_payment_id': destination_payment.id,
+            'destination_journal_id': destination_journal.id
+        })
+        destination_payment.write({
+            'paired_internal_transfer_payment_id': origin_payment.id
+        })
+
+        # Publicar ambos pagos
+        origin_payment.action_post()
+        destination_payment.action_post()
+
+    def _get_check_fields(self, method_line):
+        """Obtener campos de cheque CORREGIDOS"""
+        check_fields = {}
+        if method_line.check_number:
+            check_fields['l10n_latam_check_number'] = method_line.check_number
+        if method_line.check_cash_date:
+            check_fields['l10n_latam_check_payment_date'] = method_line.check_cash_date
+        if method_line.check_bank_id:  # CORREGIDO: usar check_bank_id
+            check_fields['l10n_latam_check_bank_id'] = method_line.check_bank_id.id
+        if method_line.check_vat:
+            check_fields['l10n_latam_check_issuer_vat'] = method_line.check_vat
+        if method_line.account_journal_id:
+            check_fields['l10n_latam_check_current_journal_id'] = method_line.account_journal_id.id
+        return check_fields
+
+    def _get_default_payment_method_line(self, journal, payment_type):
+        """Obtener línea de método de pago por defecto"""
+        if payment_type == 'inbound':
+            method_lines = journal.inbound_payment_method_line_ids
+            default_method_ref = 'account.account_payment_method_manual_in'
+        else:
+            method_lines = journal.outbound_payment_method_line_ids
+            default_method_ref = 'account.account_payment_method_manual_out'
+        
+        default_method = self.env.ref(default_method_ref, False)
+        if default_method:
+            method_line = method_lines.filtered(lambda x: x.payment_method_id.id == default_method.id)
+            if method_line:
+                return method_line[0]
+        
+        return method_lines[0] if method_lines else False
+
+    def _reconcile_payment_with_invoice(self, payment, credit_line):
+        """Reconciliar pago con factura"""
+        try:
+            payment_lines = payment.line_ids.filtered(
+                lambda line: line.account_id.account_type in ['asset_receivable', 'liability_payable'] and not line.reconciled
+            )
+            
+            invoice_lines = credit_line.move_id.line_ids.filtered(
+                lambda line: line.account_id.account_type in ['asset_receivable', 'liability_payable'] and not line.reconciled
+            )
+            
+            if payment_lines and invoice_lines:
+                (payment_lines + invoice_lines).reconcile()
+                credit_line.move_id._compute_payment_state()
+                
+        except Exception as e:
+            _logger.warning(f"Error reconciling payment {payment.id}: {e}")
+
+    def _delete_accounting_notes(self):
+        """Eliminar líneas con importe 0"""
+        lines_to_remove = self.account_move_line_payment_agg_ids.filtered(
+            lambda line: line.payment_aggregator_total_import == 0
+        )
+        self.write({'account_move_line_payment_agg_ids': [(3, line.id) for line in lines_to_remove]})
+
+    # Mantener métodos existentes para botones y otros
+    def button_open_accounting_notes(self):
+        self.ensure_one()
+        move_ids = self.env['account.move.line'].search([('payment_aggregator_id', '=', self.id)])
+        return {
+            'name': 'Asientos Contables',
+            'type': 'ir.actions.act_window',
+            'res_model': 'account.move.line',
+            'view_mode': 'tree,form',
+            'domain': [('id', 'in', move_ids.ids)],
+            'context': {'group_by': ['journal_id']},
+        }
     
+    def button_open_grouped_payments(self):
+        self.ensure_one()
+        view_id = self.env.ref('multiple_payments.view_account_payment_tree_grouped_simple', False)
+        return {
+            'name': 'Pagos Agrupados',
+            'type': 'ir.actions.act_window',
+            'res_model': 'account.payment',
+            'view_mode': 'tree,form',
+            'context': {'group_by': ['transaction_type']},
+            'domain': [('payment_aggregator_id', '=', self.id)]
+        }
+    
+    def button_update_accounting_notes(self):
+        self.filter_credit_moves()
+    
+    def button_delete_accounting_notes(self):
+        self._delete_accounting_notes()
+    
+    def button_apply_fifo(self):
+        if self.difference > 0 and self.account_move_line_payment_agg_ids:
+            sorted_moves = self.account_move_line_payment_agg_ids.sorted(key=lambda r: r.date or fields.Date.today())
+            remaining_difference = self.difference
+            
+            for move in sorted_moves:
+                if move.payment_aggregator_total_import == 0:
+                    total_import = abs(move.credit) + abs(move.debit)
+                    if total_import <= 0:
+                        continue
+                    if remaining_difference >= total_import:
+                        move.payment_aggregator_total_import = total_import
+                        remaining_difference -= total_import
+                    else:
+                        break
+
+    def button_assign_all(self):
+        for record in self.account_move_line_payment_agg_ids:
+            if record.payment_aggregator_total_import == 0:
+                total_import = record.credit + record.debit
+                if (self.difference - total_import) >= 0:
+                    record.payment_aggregator_total_import = total_import
+
+    # Mantener otros métodos existentes
+    @api.depends('account_journals_currency_ids')
+    def _get_account_journals_currency_domain_compute(self):
+        for record in self:
+            record.account_journals_currency_ids = self.env["res.currency"].search(record._get_account_journals_currency_domain()).ids
+
+    def _get_account_journals_currency_domain(self):
+        for record in self:
+            account_journals = record.env["account.journal.aggregator"].search([("company_id","=", self.env.company.id)])
+            return [('id','in', account_journals.mapped("currency_id.id"))]
+
     @api.onchange('customer_id', 'currency_id')
     def filter_credit_moves(self):
         self.mps_credits_line_ids = self.search_account_move_line()
         self.set_account_move_line(self.mps_credits_line_ids)
-
         if self.currency_id:
             intermediate_diary = self.env["account.journal.aggregator"].search([
                 ('company_id','=',self.env.company.id),
@@ -454,15 +384,13 @@ class PaymentAggregator(models.Model):
                 self.account_journal_aggregator_id = intermediate_diary.id
 
     def assign_domain(self, payment_state='not_paid'):
-
         return [
-                    ('partner_id', '=', self.customer_id.id),
-                    ('currency_id', '=', self.currency_id.id),
-                    ('account_id.account_type', 'in', ['asset_receivable', 'liability_payable']), 
-                    # ('move_id.payment_state','=', payment_state),
-                    ('move_id.move_type', 'in', ['out_invoice','in_invoice']),
-                    ('move_id.state','=','posted')
-                ]
+            ('partner_id', '=', self.customer_id.id),
+            ('currency_id', '=', self.currency_id.id),
+            ('account_id.account_type', 'in', ['asset_receivable', 'liability_payable']), 
+            ('move_id.move_type', 'in', ['out_invoice','in_invoice']),
+            ('move_id.state','=','posted')
+        ]
     
     def search_account_move_line(self):
         return self.env['account.move.line'].search(self.assign_domain())
@@ -480,81 +408,7 @@ class PaymentAggregator(models.Model):
                     })
                     aggregator_ids.append(aggregator_record.id if aggregator_record.id else aggregator_record.origin)
         self.account_move_line_payment_agg_ids = [(6, 0, aggregator_ids)]
-    
-    def button_open_accounting_notes(self):
-        self.ensure_one()
-        move_ids = self.env['account.move.line'].search([('payment_aggregator_id', '=', self.id)])
-        # _logger.info(move_ids)
-        return {
-        'name': 'Asientos Contables',
-        'type': 'ir.actions.act_window',
-        'res_model': 'account.move.line',
-        'view_mode': 'tree,form',
-        'domain': [('id', 'in', move_ids.ids)],
-        'context': {
-                'group_by': ['journal_id'],
-            },
-        
-    }
-    
-    def button_open_grouped_payments(self):
-        self.ensure_one()
-        
-        # Buscar la vista específica si existe
-        view_id = self.env.ref('multiple_payments.view_account_payment_tree_grouped_simple', False)
-        
-        return {
-            'name': 'Pagos Agrupados',
-            'type': 'ir.actions.act_window',
-            'res_model': 'account.payment',
-            'view_mode': 'tree,form',
-            'context': {
-                'group_by': ['transaction_type'],
-                # 'search_default_partner_id': self.customer_id.id if self.customer_id else False,
-            },
-            'domain': [('payment_aggregator_id', '=', self.id)]
-        }
-    
-    def button_update_accounting_notes(self):
-        self.filter_credit_moves()
-        return
-    
-    # Accion del boton de eliminacion de cuentas en 0
-    def button_delete_accounting_notes(self):
-        # Metodo para eliminar los registros donde total_import es 0
-        self._delete_accounting_notes()
-        return
-    
-    def _delete_accounting_notes(self):
-        # Filtrar solo los registros donde total_import es 0
-        lines_to_remove = self.account_move_line_payment_agg_ids.filtered(lambda line: line.payment_aggregator_total_import == 0)
-        # Eliminar solo esas líneas
-        self.write({'account_move_line_payment_agg_ids': [(3, line.id) for line in lines_to_remove]})
-        return True
 
-    def button_apply_fifo(self):
-        if self.difference > 0 and self.account_move_line_payment_agg_ids:
-            sorted_moves = self.account_move_line_payment_agg_ids.sorted(key=lambda r: r.date or fields.Date.today())
-            
-            for move in sorted_moves:
-                if move.payment_aggregator_total_import == 0:
-                    total_import = abs(move.credit) + abs(move.debit)
-                    if total_import <= 0:
-                        continue
-                    if (self.difference - total_import) >= 0:
-                        move.payment_aggregator_total_import = total_import
-                    else:
-                        break
-
-    def button_assign_all(self):
-        for record in self.account_move_line_payment_agg_ids:
-            if record.payment_aggregator_total_import == 0:
-                total_import = record.credit + record.debit
-                if (self.difference - total_import) >= 0:
-                        record.payment_aggregator_total_import = total_import
-
-        return
-    
     @api.model
     def create(self, values):
         values['company_id'] = self.env.company.id
@@ -563,30 +417,8 @@ class PaymentAggregator(models.Model):
         return result
     
     @api.onchange('receiptbook_id')
-    def _validate_recieptbook (self):
+    def _validate_recieptbook(self):
         if self.receiptbook_id.partner_type:
             if str(self.receiptbook_id.partner_type) not in self.domain_receiptbook_id:
                 raise ValidationError(_(f'You cannot set a {self.receiptbook_id.partner_type.capitalize()} reciept type in this payment aggregator'))
-
-    # Metodo para forzar el valor de debito y credito
-    def _setDebitCreditAmount(self, payment, amount):
-        line_ids = []
-        for line in payment.move_id.line_ids:
-            if line.debit == 0:
-                if line.credit != 0:
-                    line_ids.append(
-                        (1,line.id, {
-                            "credit": amount if line.credit > 0 else (amount * -1),
-                            "balance": amount if line.balance > 0 else (amount * -1)
-                        })
-                    )
-            else:
-                line_ids.append(
-                    (1,line.id, {
-                        "debit": amount if line.debit > 0 else (amount * -1),
-                        "balance": amount if line.balance > 0 else (amount * -1),
-                    })
-                )
-        payment.move_id.write({
-            'line_ids': line_ids
-        })
+                        
