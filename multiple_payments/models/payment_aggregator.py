@@ -5,11 +5,17 @@ import logging
 
 _logger = logging.getLogger(__name__)
 
+# ===================================================================
+# PAYMENT AGGREGATOR - VERSIÓN ACTUALIZADA 2025-09-01
+# Compatible con internal_transfer_payment_fix module
+# Cambios: Detección automática de módulos conflictivos
+# ===================================================================
+
 class PaymentAggregator(models.Model):
     _name = 'mps.payment.aggregator'
     _description = 'Model to save payment aggregator'
 
-    # Campos básicos (mantener los existentes)
+    # ===== CAMPOS BÁSICOS - NO MODIFICAR =====
     name = fields.Char(required=True, default="Borrador")
     company_id = fields.Many2one(
         'res.company', 
