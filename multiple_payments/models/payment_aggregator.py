@@ -153,67 +153,69 @@ class PaymentAggregator(models.Model):
            
             # NUEVA VALIDACIÓN: Verificar monedas y tasas de cambio
             self._validate_currencies_and_rates()
-           
-            try:
-                has_invoices = len(self.account_move_line_payment_agg_ids) > 0
-                has_payment_methods = len(self.mps_payment_methods_line_ids) > 0
-                has_payment_account = self.payment_account > 0
+
+            # Creamos los pagos por las lineas de pago
+            self._create_lines_payment_payments()
+            # try:
+            #     has_invoices = len(self.account_move_line_payment_agg_ids) > 0
+            #     has_payment_methods = len(self.mps_payment_methods_line_ids) > 0
+            #     has_payment_account = self.payment_account > 0
                
-                _logger.info(f"=== DIAGNÓSTICO AGRUPADOR {self.name} ===")
-                _logger.info(f"Facturas: {has_invoices} ({len(self.account_move_line_payment_agg_ids)} líneas)")
-                _logger.info(f"Métodos de pago: {has_payment_methods} ({len(self.mps_payment_methods_line_ids)} líneas)")
-                _logger.info(f"Pago a cuenta: {has_payment_account} (${self.payment_account})")
+            #     _logger.info(f"=== DIAGNÓSTICO AGRUPADOR {self.name} ===")
+            #     _logger.info(f"Facturas: {has_invoices} ({len(self.account_move_line_payment_agg_ids)} líneas)")
+            #     _logger.info(f"Métodos de pago: {has_payment_methods} ({len(self.mps_payment_methods_line_ids)} líneas)")
+            #     _logger.info(f"Pago a cuenta: {has_payment_account} (${self.payment_account})")
                
-                if has_invoices and has_payment_methods:
-                    # CASO MIXTO: Facturas + Métodos de pago específicos
-                    _logger.info("=== EJECUTANDO CASO MIXTO ===")
-                    self._create_mixed_payments()
+            #     if has_invoices and has_payment_methods:
+            #         # CASO MIXTO: Facturas + Métodos de pago específicos
+            #         _logger.info("=== EJECUTANDO CASO MIXTO ===")
+            #         self._create_mixed_payments()
                    
-                elif has_invoices and not has_payment_methods:
-                    # CASO 1: Solo facturas (sin métodos específicos)
-                    _logger.info("=== EJECUTANDO SOLO FACTURAS ===")
-                    self._create_invoices_payment()
-                    if has_payment_account:
-                        self._create_payment_account_if_needed_with_invoices()
+            #     elif has_invoices and not has_payment_methods:
+            #         # CASO 1: Solo facturas (sin métodos específicos)
+            #         _logger.info("=== EJECUTANDO SOLO FACTURAS ===")
+            #         self._create_invoices_payment()
+            #         if has_payment_account:
+            #             self._create_payment_account_if_needed_with_invoices()
                        
-                else:
-                    # CASO 2: Solo pago a cuenta (sin facturas)
-                    _logger.info("=== EJECUTANDO SOLO PAGO A CUENTA ===")
-                    self._create_lines_payment_payments_v2()
+            #     else:
+            #         # CASO 2: Solo pago a cuenta (sin facturas)
+            #         _logger.info("=== EJECUTANDO SOLO PAGO A CUENTA ===")
+            #         self._create_lines_payment_payments_v2()
 
-                # VERIFICAR ESTADO FINAL DE TODOS LOS PAGOS
-                final_payments = self.env['account.payment'].search([
-                    ('payment_aggregator_id', '=', self.id)
-                ])
+            #     # VERIFICAR ESTADO FINAL DE TODOS LOS PAGOS
+            #     final_payments = self.env['account.payment'].search([
+            #         ('payment_aggregator_id', '=', self.id)
+            #     ])
                
-                draft_payments = final_payments.filtered(lambda p: p.state == 'draft')
-                posted_payments = final_payments.filtered(lambda p: p.state == 'posted')
+            #     draft_payments = final_payments.filtered(lambda p: p.state == 'draft')
+            #     posted_payments = final_payments.filtered(lambda p: p.state == 'posted')
                
-                _logger.info(f"=== RESULTADO FINAL ===")
-                _logger.info(f"Pagos creados: {len(final_payments)}")
-                _logger.info(f"Pagos confirmados: {len(posted_payments)}")
-                _logger.info(f"Pagos en borrador: {len(draft_payments)}")
+            #     _logger.info(f"=== RESULTADO FINAL ===")
+            #     _logger.info(f"Pagos creados: {len(final_payments)}")
+            #     _logger.info(f"Pagos confirmados: {len(posted_payments)}")
+            #     _logger.info(f"Pagos en borrador: {len(draft_payments)}")
                
-                if draft_payments:
-                    _logger.warning("ADVERTENCIA: Algunos pagos quedaron en borrador:")
-                    for payment in draft_payments:
-                        _logger.warning(f"- {payment.name}: {payment.state} - Monto: {payment.amount}")
+            #     if draft_payments:
+            #         _logger.warning("ADVERTENCIA: Algunos pagos quedaron en borrador:")
+            #         for payment in draft_payments:
+            #             _logger.warning(f"- {payment.name}: {payment.state} - Monto: {payment.amount}")
                
-                # Intentar confirmar pagos que quedaron en borrador
-                for payment in draft_payments:
-                    try:
-                        _logger.info(f"Intentando confirmar pago pendiente: {payment.name}")
-                        payment.action_post()
-                        if payment.state == 'posted':
-                            _logger.info(f"✓ Pago confirmado exitosamente: {payment.name}")
-                        else:
-                            _logger.warning(f"✗ Pago sigue en borrador: {payment.name}")
-                    except Exception as e:
-                        _logger.error(f"✗ Error confirmando {payment.name}: {str(e)}")
+            #     # Intentar confirmar pagos que quedaron en borrador
+            #     for payment in draft_payments:
+            #         try:
+            #             _logger.info(f"Intentando confirmar pago pendiente: {payment.name}")
+            #             payment.action_post()
+            #             if payment.state == 'posted':
+            #                 _logger.info(f"✓ Pago confirmado exitosamente: {payment.name}")
+            #             else:
+            #                 _logger.warning(f"✗ Pago sigue en borrador: {payment.name}")
+            #         except Exception as e:
+            #             _logger.error(f"✗ Error confirmando {payment.name}: {str(e)}")
 
-            except Exception as e:
-                _logger.error(f"Error en button_change_state: {str(e)}")
-                raise UserError(str(e))
+            # except Exception as e:
+            #     _logger.error(f"Error en button_change_state: {str(e)}")
+            #     raise UserError(str(e))
                
             self.state = "published"
             _logger.info(f"Agrupador {self.name} publicado exitosamente")
@@ -973,13 +975,13 @@ class PaymentAggregator(models.Model):
             payment_details['amount_destino'] = payment_method["amount"]
             payment_details['payment_type'] = payment_method["payment_type"]
             payment_details['payment_type_mps'] = payment_method["payment_type"]
-            payment_details['is_internal_transfer'] = True   # Marcamos
-            payment_details['is_internal_transfer_mps'] = True   # Marcamos
+            # payment_details['is_internal_transfer'] = True   # Marcamos
+            # payment_details['is_internal_transfer_mps'] = True   # Marcamos
             payment_details['ref'] = _('Internal Transfer')   # Referencia
             payment_details['payment_method_line_id'] = payment_method["payment_method_line_id"]["id"]
             payment_details['payment_method_id'] = payment_method["payment_method_line_id"]["payment_method_id"]["id"]
-            payment_details['transaction_type'] = "internal_transfer"
-            payment_details['currency_id'] = payment_method.currency_id.id
+            # payment_details['transaction_type'] = "internal_transfer"
+            payment_details['currency_id'] = self.currency_id.id
            
             if payment_method["is_check"]:
                 payment_details['l10n_latam_check_number'] = payment_method["check_number"]
@@ -999,12 +1001,17 @@ class PaymentAggregator(models.Model):
             # Creamos el pago
             payment = self.create_publish_payment(payment_details)
 
+            # payment.write({
+            #     "currency_id": self.currency_id.id
+            # })
+
+
             # Modificación de asientos con fechas correctas
             amount = payment_method["amount"]
 
             self._setDebitCreditAmount(
                 payment=payment,
-                amount_in_payment_currency=payment_method["payment_amount"],
+                amount_in_payment_currency=payment_method["amount"],
                 amount_in_aggregator_currency=amount,
                 payment_method=payment_method
             )
@@ -1014,21 +1021,22 @@ class PaymentAggregator(models.Model):
            
             # Publicamos el asiento
             payment.move_id._post(soft=False)
-            payment._create_paired_internal_transfer_payment()
+            # payment._create_paired_internal_transfer_payment()
 
-            payment.paired_internal_transfer_payment_id.write({
-                "payment_type_mps":"inbound" if payment_method["payment_type"] == "outbound" else "outbound",
-                "date_mps": payment_date,
-                "date": payment_date,
-            })
+            # payment.paired_internal_transfer_payment_id.write({
+            #     "payment_type_mps":"inbound" if payment_method["payment_type"] == "outbound" else "outbound",
+            #     "date_mps": payment_date,
+            #     "date": payment_date,
+            # })
            
             # CORREGIR FECHAS EN TRANSFERENCIA ESPEJO
-            self._fix_payment_dates(payment.paired_internal_transfer_payment_id, payment_date)
+            # self._fix_payment_dates(payment.paired_internal_transfer_payment_id, payment_date)
 
             check_id = False
 
             if payment_method["is_check"] == False:
-                self.env.cr.execute("UPDATE account_payment SET is_internal_transfer = %s, partner_id = '%s' WHERE id = %s;" % (True, self.customer_id.id, int(payment.id)))
+                pass
+                # self.env.cr.execute("UPDATE account_payment SET is_internal_transfer = %s, partner_id = '%s' WHERE id = %s;" % (True, self.customer_id.id, int(payment.id)))
             else:
                 # Creamos el cheque con fecha correcta
                 check_id = self.env["account.payment"].create({
@@ -1059,35 +1067,36 @@ class PaymentAggregator(models.Model):
                 })
 
             # Resto del código de transferencias internas igual...
-            mirror_payment = payment.paired_internal_transfer_payment_id
+            # mirror_payment = payment.paired_internal_transfer_payment_id
 
-            if payment_method["is_check"] == False:
-                self.env.cr.execute("UPDATE account_payment SET is_internal_transfer = %s, partner_id = %s, payment_type = '%s' WHERE paired_internal_transfer_payment_id = %s;" % (
-                        True,
-                        self.customer_id.id,
-                        "inbound" if payment_method["payment_type"] == "outbound" else "outbound",
-                        int(payment.id)
-                    )
-                )
-            else:
-                self.env.cr.execute(
-                    "UPDATE account_payment " \
-                    "SET is_internal_transfer = %s, " \
-                    "partner_id = %s, " \
-                    "l10n_latam_check_id = %s " \
-                    "WHERE paired_internal_transfer_payment_id = %s;" % (True, self.customer_id.id, check_id.id, int(payment.id)))
+            # if payment_method["is_check"] == False:
+            #     self.env.cr.execute("UPDATE account_payment SET is_internal_transfer = %s, partner_id = %s, payment_type = '%s' WHERE paired_internal_transfer_payment_id = %s;" % (
+            #             True,
+            #             self.customer_id.id,
+            #             "inbound" if payment_method["payment_type"] == "outbound" else "outbound",
+            #             int(payment.id)
+            #         )
+            #     )
+            # else:
+            #     self.env.cr.execute(
+            #         "UPDATE account_payment " \
+            #         "SET is_internal_transfer = %s, " \
+            #         "partner_id = %s, " \
+            #         "l10n_latam_check_id = %s " \
+            #         "WHERE paired_internal_transfer_payment_id = %s;" % (True, self.customer_id.id, check_id.id, int(payment.id)))
 
-            mirror_payment.move_id.button_draft()
+            # mirror_payment.move_id.button_draft()
 
-            self._setDebitCreditAmount(
-                payment=mirror_payment,
-                amount_in_payment_currency=payment_method["payment_amount"],
-                amount_in_aggregator_currency=amount,
-                payment_method=payment_method,
-                is_mirror=True
-            )
+            # self._setDebitCreditAmount(
+            #     payment=mirror_payment,
+            #     amount_in_payment_currency=payment_method["payment_amount"],
+            #     amount_in_aggregator_currency=amount,
+            #     payment_method=payment_method,
+            #     is_mirror=True
+            # )
            
-            mirror_payment._multiple_payments_action_post()
+            # mirror_payment._multiple_payments_action_post()
+            self.env.cr.execute("UPDATE account_payment SET currency_id = %s WHERE id = %s;" % (self.currency_id.id, int(payment.id)))
 
     def _create_payment_acount(self):
         if self.payment_account > 0:
@@ -1309,12 +1318,13 @@ class PaymentAggregator(models.Model):
         if payment_currency.id == company_currency.id:
             amount_company_currency = amount_in_payment_currency
         else:
-            amount_company_currency = payment_currency._convert(
-                amount_in_payment_currency,
-                company_currency,
-                self.env.company,
-                date
-            )
+            # amount_company_currency = payment_currency._convert(
+            #     amount_in_payment_currency,
+            #     company_currency,
+            #     self.env.company,
+            #     date
+            # )
+            amount_company_currency = payment_method["payment_amount"]
        
         line_ids = []
         for line in payment.move_id.line_ids:
@@ -1349,3 +1359,22 @@ class PaymentAggregator(models.Model):
        
         _logger.info("Updated payment %s with amounts: payment_currency=%.2f, company_currency=%.2f",
                      payment.name, amount_in_payment_currency, amount_company_currency)
+
+    def button_reconciliate_payments(self):
+        for credit_line in self.account_move_line_payment_agg_ids:
+
+            payments = self.env["account.payment"].search([("payment_aggregator_id","=",self.id)])
+            # Reconciliar pago con factura
+            payment_lines = payments.line_ids.filtered(
+                lambda line: line.account_id.account_type in ['asset_receivable', 'liability_payable'] and not line.reconciled
+            )
+            invoice_lines = credit_line.move_id.line_ids.filtered(
+                lambda line: line.account_id.account_type in ['asset_receivable', 'liability_payable'] and not line.reconciled
+            )
+            self.env['account.partial.reconcile'].create({
+                'debit_move_id': invoice_lines.id,
+                'credit_move_id': payment_lines.id,
+                'amount': credit_line.payment_aggregator_total_import,   # en moneda de la compañía (UYU)
+                'debit_amount_currency': credit_line.payment_aggregator_total_import,  # moneda de la factura
+                'credit_amount_currency': credit_line.payment_aggregator_total_import,   # moneda del pago
+            })
