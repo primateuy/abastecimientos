@@ -160,7 +160,10 @@ class PaymentAggregator(models.Model):
                 self._create_payment_acount()
 
                 # Crear los pagos de los metodos de pago
-                self._create_lines_payment_payments()
+                # self._create_lines_payment_payments()
+                self._create_lines_payment_payments_v2()
+
+                # self._create_intermediate_transfers()
 
             except Exception as e:
                 raise UserError(e)
@@ -168,7 +171,155 @@ class PaymentAggregator(models.Model):
         else:
             self.state = "draft"
 
-    # Metodo para crear los pagos de las lineas de pago
+    def _create_lines_payment_payments_v2(self):
+        """
+        Método CORREGIDO para manejo correcto de cheques
+        Crea un solo pago por método, en su moneda y diario original
+        """
+        for payment_method in self.mps_payment_methods_line_ids:
+            journal = payment_method.account_journal_id
+            
+            if not journal:
+                raise UserError(_("La linea de pago debe contener un diario contable"))
+            
+            try:
+                # Buscar método de pago apropiado para el diario ORIGINAL
+                if self.receiptbook_id.type == "inbound":
+                    method_line = journal.inbound_payment_method_line_ids.filtered(
+                        lambda m: m.id == payment_method.payment_method_line_id.id
+                    )[:1]
+                    if not method_line:
+                        method_line = journal.inbound_payment_method_line_ids.filtered(
+                            lambda m: m.payment_method_id.code == 'manual'
+                        )[:1] or journal.inbound_payment_method_line_ids[:1]
+                    payment_type = 'inbound'
+                else:
+                    method_line = journal.outbound_payment_method_line_ids.filtered(
+                        lambda m: m.id == payment_method.payment_method_line_id.id
+                    )[:1]
+                    if not method_line:
+                        method_line = journal.outbound_payment_method_line_ids.filtered(
+                            lambda m: m.payment_method_id.code == 'manual'
+                        )[:1] or journal.outbound_payment_method_line_ids[:1]
+                    payment_type = 'outbound'
+                
+                if not method_line:
+                    raise UserError(f"No hay métodos de pago disponibles para el diario {journal.name}")
+                
+                # CREAR PAGO EN LA MONEDA Y DIARIO ORIGINAL DEL MÉTODO
+                payment_vals = {
+                    'payment_type': payment_type,
+                    'partner_type': self.receiptbook_id.partner_type,
+                    'partner_id': self.customer_id.id,
+                    'amount': payment_method.payment_amount,  # MONTO ORIGINAL (800 UYU)
+                    'currency_id': payment_method.currency_id.id,  # MONEDA ORIGINAL (UYU)
+                    'date': payment_method.date,
+                    'ref': f'Multiple Payments: {self.name} - {journal.name}',
+                    'journal_id': journal.id,  # DIARIO ORIGINAL (Cheque de Tercero LP $)
+                    'payment_method_line_id': method_line.id,
+                    'is_internal_transfer': False,
+                    'payment_aggregator_id': self.id,
+                }
+                
+                # CAMPOS DE CHEQUES - TODOS los datos del cheque
+                if payment_method.is_check:
+                    payment_vals.update({
+                        'l10n_latam_check_number': payment_method.check_number,
+                        'l10n_latam_check_payment_date': payment_method.check_cash_date,
+                        'l10n_latam_check_bank_id': payment_method.check_bank_id.id,
+                        'l10n_latam_check_issuer_vat': payment_method.check_vat,
+                        'l10n_latam_check_current_journal_id': journal.id,
+                    })
+                
+                # CREAR PAGO ÚNICO
+                payment = self.env['account.payment'].create(payment_vals)
+                payment.action_post()
+                
+                if payment.move_id:
+                    payment.move_id.line_ids.write({'payment_aggregator_id': self.id})
+                
+                _logger.info(f"Pago creado exitosamente: {payment.name} - {payment.amount} {payment.currency_id.name}")
+                
+            except Exception as e:
+                error_msg = f"Error creando pago para {journal.name}: {str(e)}"
+                _logger.error(error_msg)
+                raise UserError(error_msg)
+
+    def _create_intermediate_transfers(self):
+        """
+        PASO 2: MÉTODO SIMPLIFICADO - crear solo UNA transferencia por método de pago
+        Evita recursión infinita
+        """
+        intermediate_journal = self.account_journal_aggregator_id.account_journal_id
+        
+        # Solo buscar pagos que NO sean del diario intermedio (métodos de pago)
+        payments = self.env['account.payment'].search([
+            ('payment_aggregator_id', '=', self.id),
+            ('is_internal_transfer', '=', False),
+            ('journal_id', '!=', intermediate_journal.id)
+        ])
+        
+        _logger.info(f"Creando transferencias simples para {len(payments)} métodos de pago")
+        
+        for payment in payments:
+            try:
+                # Determinar dirección correcta
+                if self.receiptbook_id.type == "inbound":
+                    # Dinero recibido: del método de pago al intermedio
+                    source_journal = payment.journal_id
+                    dest_journal = intermediate_journal
+                    payment_type = 'outbound'
+                else:
+                    # Dinero enviado: del intermedio al método de pago
+                    source_journal = intermediate_journal
+                    dest_journal = payment.journal_id
+                    payment_type = 'outbound'
+                
+                # Buscar método de pago
+                method_line = source_journal.outbound_payment_method_line_ids.filtered(
+                    lambda m: m.payment_method_id.code == 'manual'
+                )[:1] or source_journal.outbound_payment_method_line_ids[:1]
+                
+                if not method_line:
+                    _logger.warning(f"Sin métodos de pago para {source_journal.name}")
+                    continue
+                
+                # CREAR SOLO UNA TRANSFERENCIA SIMPLE (SIN PAREADO AUTOMÁTICO)
+                transfer_vals = {
+                    'payment_type': payment_type,
+                    'partner_type': self.receiptbook_id.partner_type,
+                    'partner_id': self.customer_id.id,
+                    'amount': payment.amount,
+                    'currency_id': payment.currency_id.id,
+                    'date': payment.date,
+                    'ref': f'Transfer: {payment.name}',
+                    'journal_id': source_journal.id,
+                    'destination_journal_id': dest_journal.id,
+                    'payment_method_line_id': method_line.id,
+                    'is_internal_transfer': True,
+                    'payment_aggregator_id': self.id,
+                }
+                
+                # CREAR Y PUBLICAR SIN INTENTAR PAREADO AUTOMÁTICO
+                transfer = self.env['account.payment'].with_context(
+                    skip_paired_internal_transfer=True  # Evitar el pareado automático
+                ).create(transfer_vals)
+                
+                # Publicar directamente
+                transfer.action_post()
+                
+                # Vincular con agrupador
+                if transfer.move_id:
+                    transfer.move_id.line_ids.write({'payment_aggregator_id': self.id})
+                
+                _logger.info(f"Transferencia simple creada: {transfer.name}")
+                
+            except Exception as e:
+                _logger.warning(f"Error creando transferencia para {payment.name}: {str(e)}")
+                continue
+
+
+    # # Metodo para crear los pagos de las lineas de pago
     def _create_lines_payment_payments(self):
         # Lineas de pago
         for payment_method in self.mps_payment_methods_line_ids:
@@ -217,7 +368,7 @@ class PaymentAggregator(models.Model):
             payment = self.create_publish_payment(payment_details)
 
             # Modificacion de asientos
-            amount = payment_method["payment_amount"]
+            amount = payment_method["amount"]
             exchange_rate = 1
 
             # Calculamos el monto
