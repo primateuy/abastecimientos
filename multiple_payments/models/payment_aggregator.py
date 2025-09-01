@@ -12,7 +12,12 @@ class PaymentAggregator(models.Model):
     # Campos básicos
     name = fields.Char(required=True, default="Borrador")
     company_id = fields.Many2one('res.company', string='company')
-    currency_id = fields.Many2one('res.currency', string='currency', domain="[('id','=',account_journals_currency_ids)]", required=False)
+    currency_id = fields.Many2one(
+        'res.currency', 
+        string='currency', 
+        domain="[('active','=',True)]", 
+        required=True
+    )
     account_journal_aggregator_id = fields.Many2one('account.journal.aggregator', string='Intermediate diary', required=True, domain=lambda self: "[('company_id','=', %s),('currency_id','=',currency_id)]" % self.env.company.id)
     account_journals_currency_ids = fields.Many2many('res.currency', domain=lambda self: str(self._get_account_journals_currency_domain()), compute="_get_account_journals_currency_domain_compute")
     state = fields.Selection([('draft', 'Draft'), ('published','Published')], default="draft")
@@ -373,13 +378,35 @@ class PaymentAggregator(models.Model):
 
     @api.onchange('customer_id', 'currency_id')
     def filter_credit_moves(self):
-        self.mps_credits_line_ids = self.search_account_move_line()
-        self.set_account_move_line(self.mps_credits_line_ids)
-        if self.currency_id:
+        if self.customer_id and self.currency_id:
+            self.mps_credits_line_ids = self.search_account_move_line()
+            self.set_account_move_line(self.mps_credits_line_ids)
+            
+            # Buscar o crear diario intermedio
             intermediate_diary = self.env["account.journal.aggregator"].search([
                 ('company_id','=',self.env.company.id),
                 ('currency_id','=',self.currency_id.id)
             ], limit=1)
+            
+            if not intermediate_diary:
+                # Buscar un diario disponible para usar como intermedio
+                available_journal = self.env['account.journal'].search([
+                    ('type', 'in', ['bank', 'cash']),
+                    ('company_id', '=', self.env.company.id),
+                    '|', ('currency_id', '=', self.currency_id.id), ('currency_id', '=', False),
+                    ('intermediate_diary', '=', False)
+                ], limit=1)
+                
+                if available_journal:
+                    # Crear el diario intermedio automáticamente
+                    intermediate_diary = self.env["account.journal.aggregator"].create({
+                        'account_journal_id': available_journal.id,
+                        'company_id': self.env.company.id,
+                        'currency_id': self.currency_id.id
+                    })
+                    # Marcar el diario como intermedio
+                    available_journal.intermediate_diary = True
+            
             if intermediate_diary:
                 self.account_journal_aggregator_id = intermediate_diary.id
 
