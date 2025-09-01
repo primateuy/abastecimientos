@@ -53,12 +53,7 @@ class MPPaymentMethodsLine(models.Model):
         related='payment_method_line_id.payment_method_id',
     )
     payment_method_code = fields.Char(related='payment_method_id.code')
-    # payment_method_line_id = fields.Many2one(
-    #     "account.payment.method.line",
-    #     string="Payment Method",
-    #     domain=lambda self: str(self._getPaymentMethodDomain()),
-    #     default=lambda self: self._get_default_payment_method()
-    # )
+    
     available_payment_method_line_ids = fields.Many2many(
         'account.payment.method.line',
         compute='_compute_payment_method_line_fields'
@@ -128,7 +123,6 @@ class MPPaymentMethodsLine(models.Model):
     def onchange_account_journal_id(self):
         if not self.account_journal_id:
             # Generamos el domain para el metodo de pago
-            # self.payment_method_domain = self._generatePaymentMethodDomain()
             self.payment_method_domain = "[('id', 'in', %s), ('payment_method_id.code', '!=', 'in_third_party_checks')]" % self.available_payment_method_line_ids.ids
 
             # Invocamos el metodo para controlar la visibilidad del tipo de pago
@@ -140,7 +134,6 @@ class MPPaymentMethodsLine(models.Model):
             self.have_journal_currency = False
         else:
             # Establecemos el domain
-            # self.payment_method_domain = str(self._getPaymentMethodDomain())
             self.payment_method_domain = "[('id', 'in', %s), ('payment_method_id.code', '!=', 'in_third_party_checks')]" % self.available_payment_method_line_ids.ids
 
             if not self.account_journal_id.currency_id:
@@ -157,42 +150,92 @@ class MPPaymentMethodsLine(models.Model):
             if self.payment_aggregator_currency_id:
                 self.exchange_rate_visibility = self._checkSameCurrency() == False
                 if self.exchange_rate_visibility:
-                    # Obtenemos tasa
-                    currency_rate = self._getCurrencyRate()
-
-                    # _logger.info("===========")
-                    # _logger.info(currency_rate)
-                    # _logger.info(currency_rate["inverse_company_rate"])
-                    # Asignamos
-                    if currency_rate == False:
-                        self.exchange_rate = 1
-                    else:
-                        self.exchange_rate = currency_rate["inverse_company_rate"]
+                    # CORREGIDO: Usar el método mejorado para obtener tasa
+                    self._compute_exchange_rate_auto()
             
+            # Recalcular el importe con la nueva moneda
             self.onchange_payment_amount()
 
-    # Metodo para verificar si se esta usando la misma moneda en el agrupador de pago
+    # MÉTODO CORREGIDO: Verificar si se usa la misma moneda
     def _checkSameCurrency(self):
+        """Verificar si la moneda del método de pago es igual a la del agrupador"""
+        if not self.currency_id or not self.payment_aggregator_currency_id:
+            return True
         return self.currency_id.id == self.payment_aggregator_currency_id.id
 
-    # Onchange para calcular el precio de la tasa
+    # MÉTODO NUEVO: Calcular tasa de cambio automáticamente
+    def _compute_exchange_rate_auto(self):
+        """Calcular la tasa de cambio usando los métodos oficiales de Odoo"""
+        if self._checkSameCurrency():
+            self.exchange_rate = 1.0
+            return
+
+        try:
+            # Usar el método oficial de conversión de Odoo para obtener la tasa
+            date = self.date or fields.Date.today()
+            company = self.env.company
+            
+            # Convertir 1 unidad de la moneda de pago a la moneda del agrupador
+            converted_amount = self.currency_id._convert(
+                1.0,
+                self.payment_aggregator_currency_id,
+                company,
+                date
+            )
+            
+            self.exchange_rate = converted_amount if converted_amount > 0 else 1.0
+            
+        except Exception as e:
+            _logger.warning("Error calculating exchange rate: %s", str(e))
+            self.exchange_rate = 1.0
+
+    # MÉTODO CORREGIDO: Calcular importes con conversión de monedas
     @api.onchange('payment_amount','exchange_rate','amount')
     def onchange_payment_amount(self):
-        if self.payment_amount and self.exchange_rate and self._checkSameCurrency() == False:
-            if  self.payment_aggregator_currency_id.rate > self.currency_id.rate:
-                self.amount = self.payment_amount * self.exchange_rate
-            else:
-                self.amount = self.payment_amount / self.exchange_rate
-        elif (self.payment_amount and not self.exchange_rate) or (self.payment_amount and self._checkSameCurrency() == True):
+        """Recalcular importes cuando cambia el monto del pago o la tasa de cambio"""
+        
+        # Si no hay monto de pago, limpiar el importe
+        if not self.payment_amount:
+            self.amount = 0
+            return
+        
+        # Si las monedas son iguales, no hay conversión
+        if self._checkSameCurrency():
             self.amount = self.payment_amount
+            self.exchange_rate = 1.0
+            return
+        
+        # Si hay conversión de monedas
+        if self.exchange_rate and self.exchange_rate > 0:
+            try:
+                # Usar el método oficial de conversión de Odoo
+                date = self.date or fields.Date.today()
+                company = self.env.company
+                
+                # Convertir el monto de pago a la moneda del agrupador
+                self.amount = self.currency_id._convert(
+                    self.payment_amount,
+                    self.payment_aggregator_currency_id,
+                    company,
+                    date
+                )
+                
+            except Exception as e:
+                _logger.warning("Error in currency conversion: %s", str(e))
+                # Fallback: usar cálculo manual
+                self.amount = self.payment_amount * self.exchange_rate
+        else:
+            # Recalcular la tasa automáticamente
+            self._compute_exchange_rate_auto()
+            # Y luego calcular el importe
+            if self.exchange_rate > 0:
+                self.amount = self.payment_amount * self.exchange_rate
 
     # Onchange para detectar si el metodo de pago es cheques
     @api.onchange('payment_method_id')
     def onchange_payment_method_id(self):
         if self.payment_method_id:
             self.is_check = self.payment_method_id.code in check_codes
-            # if self.is_check:
-            #     self.check_bank = self.account_journal_id.bank_id.name
     
     # Metodo para obtener la moneda del agrupador pago
     def _getPaymentAggregatorCurrency(self):
@@ -221,7 +264,7 @@ class MPPaymentMethodsLine(models.Model):
             aggregator_currency = self._getPaymentAggregatorCurrency()
 
             # si es la misma moneda, la tasa de cambio debe ser 1
-            if aggregator_currency.id == self.currency_id.id:
+            if aggregator_currency and self.currency_id and aggregator_currency.id == self.currency_id.id:
                 self.exchange_rate = 1
 
             if receiptbook:
@@ -261,26 +304,34 @@ class MPPaymentMethodsLine(models.Model):
     def _getAccountJournalDomain(self):
         return ['|',('type','=','cash'),('type','=','bank'),('intermediate_diary','=',False),('company_id','=', self.env.company.id)]
 
-    # Obtenemos la tasa mas actual
+    # MÉTODO CORREGIDO: Obtener tasa de cambio usando métodos oficiales de Odoo
     def _getCurrencyRate(self):
+        """Obtener la tasa de cambio más reciente usando métodos oficiales de Odoo"""
         aggregator_currency = self._getPaymentAggregatorCurrency()
-        # Validamos de donde obtener la moneda
-        if self.currency_id.id != aggregator_currency.id and self.currency_id.id == self.env.company.currency_id.id:
-            currency = aggregator_currency
-        elif self.currency_id.id == aggregator_currency.id and self.currency_id.id != self.env.company.currency_id.id:
-            currency = self.currency_id
-        elif self.account_journal_id.currency_id.id == self.env.company.currency_id.id:
-            currency = self.env.company.currency_id.id
-        elif self.account_journal_id.currency_id:
-            currency = self.account_journal_id.currency_id
-        else:
-            currency = self.env.company.currency_id
-
-        # Validamos que se cuente con tasas, de lo contrario retornemos falso
-        if len(currency.rate_ids.read()) > 0:
-            return sorted(currency.rate_ids.read(), key=lambda item: item["display_name"])[0]
-        else:
-            return False
+        
+        if not aggregator_currency or not self.currency_id:
+            return {"inverse_company_rate": 1.0}
+        
+        if aggregator_currency.id == self.currency_id.id:
+            return {"inverse_company_rate": 1.0}
+        
+        try:
+            date = self.date or fields.Date.today()
+            company = self.env.company
+            
+            # Usar el método oficial de Odoo para convertir
+            converted_amount = self.currency_id._convert(
+                1.0,
+                aggregator_currency,
+                company,
+                date
+            )
+            
+            return {"inverse_company_rate": converted_amount if converted_amount > 0 else 1.0}
+            
+        except Exception as e:
+            _logger.warning("Error getting currency rate: %s", str(e))
+            return {"inverse_company_rate": 1.0}
 
     @api.depends('available_payment_method_line_ids')
     def _compute_payment_method_line_id(self):
@@ -316,9 +367,25 @@ class MPPaymentMethodsLine(models.Model):
         if self.payment_method_id:
             self.check_domain = str([("l10n_latam_check_current_journal_id.inbound_payment_method_line_ids.payment_method_id.code", "in", ["new_third_party_checks", "in_third_party_checks"]), ('state', '=', 'posted')])
 
-
-    # def _getSupplierCheckDomain(self):
-    #     return [("l10n_latam_check_current_journal_id.inbound_payment_method_line_ids.payment_method_id.code", "in", ["new_third_party_checks", "in_third_party_checks"]), ('state', '=', 'posted')]
-    # def _getCustomerCheckDomain(self):
-
-    #     return [('payment_method_code', '=', 'new_third_party_checks'), ('l10n_latam_check_current_journal_id', '=', self.account_journal_id.id), ('state', '=', 'posted')]
+    # MÉTODO NUEVO: Validar que los datos estén correctos antes de crear pagos
+    def validate_currency_data(self):
+        """Validar que los datos de moneda y conversión sean correctos"""
+        errors = []
+        
+        if not self.payment_amount or self.payment_amount <= 0:
+            errors.append(_("Payment amount must be greater than zero"))
+        
+        if not self.amount or self.amount <= 0:
+            errors.append(_("Converted amount must be greater than zero"))
+        
+        if not self._checkSameCurrency():
+            if not self.exchange_rate or self.exchange_rate <= 0:
+                errors.append(_("Exchange rate must be greater than zero when using different currencies"))
+        
+        if not self.currency_id:
+            errors.append(_("Payment method currency must be defined"))
+        
+        if not self.payment_aggregator_currency_id:
+            errors.append(_("Payment aggregator currency must be defined"))
+            
+        return errors
