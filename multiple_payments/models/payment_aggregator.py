@@ -182,15 +182,19 @@ class PaymentAggregator(models.Model):
             # Construimos el diccionario para el pago
             payment_details = self._get_standard_payment()
             payment_details['date'] = payment_method["date"]
-            payment_details['amount'] = payment_method["payment_amount"]
-            payment_details['amount_destino'] = payment_method["payment_amount"]
+            payment_details['date_mps'] = payment_method["date"]
+            payment_details['amount'] = payment_method["amount"]
+            payment_details['amount_destino'] = payment_method["amount"]
             # payment_details['payment_type'] = self["receiptbook_id"]["type"] if not self["receiptbook_id"]["enable_reverse_payment"] else payment_method["payment_type"]
             payment_details['payment_type'] = payment_method["payment_type"]
+            payment_details['payment_type_mps'] = payment_method["payment_type"]
             payment_details['is_internal_transfer'] = True   # Marcamos
+            payment_details['is_internal_transfer_mps'] = True   # Marcamos
             payment_details['ref'] = _('Internal Transfer')   # Referencia
             payment_details['payment_method_line_id'] = payment_method["payment_method_line_id"]["id"]
             payment_details['payment_method_id'] = payment_method["payment_method_line_id"]["payment_method_id"]["id"]
             payment_details['transaction_type'] = "internal_transfer"
+            payment_details['currency_id'] = self.currency_id.id
             if payment_method["is_check"]:
                 payment_details['l10n_latam_check_number'] = payment_method["check_number"]
                 payment_details['l10n_latam_check_payment_date'] = payment_method["check_cash_date"]
@@ -213,19 +217,19 @@ class PaymentAggregator(models.Model):
             payment = self.create_publish_payment(payment_details)
 
             # Modificacion de asientos
-            amount = 0
+            amount = payment_method["payment_amount"]
             exchange_rate = 1
 
             # Calculamos el monto
-            if payment_method._checkSameCurrency() == False:
-                exchange_rate = payment_method.exchange_rate
+            # if payment_method._checkSameCurrency() == False:
+            #     exchange_rate = payment_method.exchange_rate
 
-                if  self.currency_id.rate > payment_method.currency_id.rate:
-                    amount = payment_method["payment_amount"] * exchange_rate
-                else:
-                    amount = payment_method["payment_amount"] / exchange_rate
-            else:
-                amount = payment_method["payment_amount"]
+            #     if  self.currency_id.rate > payment_method.currency_id.rate:
+            #         amount = payment_method["payment_amount"] * exchange_rate
+            #     else:
+            #         amount = payment_method["payment_amount"] / exchange_rate
+            # else:
+            #     amount = payment_method["payment_amount"]
 
             # payment.write({
             #     **payment_details,
@@ -240,9 +244,21 @@ class PaymentAggregator(models.Model):
             # Forzamos los valores de la transferencia interna
             self._setDebitCreditAmount(payment=payment, amount=amount)
 
+            payment.move_id.write({
+                "date": payment_method["date"]
+            })
             # Publicamos el asiento
             payment.move_id._post(soft=False)
             payment._create_paired_internal_transfer_payment()
+
+            payment.paired_internal_transfer_payment_id.write({
+                "payment_type_mps":"inbound" if payment_method["payment_type"] == "outbound" else "outbound",
+                "date_mps": payment_method["date"],
+                "date": payment_method["date"],
+            })
+            payment.paired_internal_transfer_payment_id.move_id.write({
+                "date": payment_method["date"],
+            })
 
             # _logger.info("payment publicado")
             # _logger.info(payment.state)
@@ -254,6 +270,7 @@ class PaymentAggregator(models.Model):
 
             if payment_method["is_check"] == False:
                 self.env.cr.execute("UPDATE account_payment SET is_internal_transfer = %s, partner_id = '%s' WHERE id = %s;" % (True, self.customer_id.id, int(payment.id)))
+                self.env.cr.execute("UPDATE account_move SET date = CAST('%s' AS DATE) WHERE id = %s;" % (payment_method["date"],int(payment.move_id.id)))
             else:
 
                 # Creamos el cheque
@@ -263,6 +280,7 @@ class PaymentAggregator(models.Model):
                     "amount": payment_method["payment_amount"],
                     "amount_destino": payment_method["payment_amount"],
                     "date": payment_method["date"],
+                    "date_mps": payment_method["date"],
                     "journal_id": journal.id,
                     "payment_method_line_id": payment_method["payment_method_line_id"]["id"],
                     "l10n_latam_check_number": payment_method["check_number"],
@@ -278,6 +296,10 @@ class PaymentAggregator(models.Model):
                 })
 
                 check_id.action_post()
+
+                payment.write({
+                    "l10n_latam_check_mps_id": check_id.id
+                })
 
                 # Actualizamos la tabla por query
                 self.env.cr.execute(
@@ -304,7 +326,13 @@ class PaymentAggregator(models.Model):
             # _logger.info(mirror_payment)
 
             if payment_method["is_check"] == False:
-                self.env.cr.execute("UPDATE account_payment SET is_internal_transfer = %s, partner_id = %s WHERE paired_internal_transfer_payment_id = %s;" % (True, self.customer_id.id, int(payment.id)))
+                self.env.cr.execute("UPDATE account_payment SET is_internal_transfer = %s, partner_id = %s, payment_type = '%s' WHERE paired_internal_transfer_payment_id = %s;" % (
+                        True, 
+                        self.customer_id.id, 
+                        "inbound" if payment_method["payment_type"] == "outbound" else "outbound", 
+                        int(payment.id)
+                    )
+                )
             else:
                 self.env.cr.execute(
                     "UPDATE account_payment " \
@@ -349,6 +377,10 @@ class PaymentAggregator(models.Model):
             # Creamos el pago
             payment = self.create_publish_payment(payment_details)
             payment.set_transaction_type()
+            payment.move_id.write({
+                "date": payment_details["date"]
+            })
+            # self._setDebitCreditAmount(payment=payment, amount=self.payment_account)
             payment.action_post()
 
     # Metodo para recorrer los apuntes contables y marcar como pagados
@@ -371,6 +403,10 @@ class PaymentAggregator(models.Model):
 
                     # Creamos el pago
                     move_id = self.create_publish_payment(payment_details)
+
+                    move_id.move_id.write({
+                        "date": payment_details["date"]
+                    })
 
                     # Invocamos el metodo para reconciliar el estatus del pago
                     move_id.set_transaction_type()
@@ -401,10 +437,13 @@ class PaymentAggregator(models.Model):
     def _get_standard_payment(self):
         return {
             'partner_id': self.customer_id.id,   # Cliente
+            "partner_mps_id": self.customer_id.id,
             'date': self.date,                   # Fecha del pago    
+            "date_mps": self.date,
             'amount': 0,                         # Monto a pagar
             'is_internal_transfer': False,       # Si es transferencia
             'payment_type': self.receiptbook_id.type,  # Tipo de pago segun el talonario
+            'payment_type_mps': self.receiptbook_id.type,  # Tipo de pago segun el talonario
             'journal_id': self.account_journal_aggregator_id.account_journal_id.id, # Diario intermedio
             'partner_type': self.receiptbook_id.partner_type, # Si es cliente o si es proveedor
             # 'payment_method_id': self.env.ref('account.account_payment_method_manual_in').id, # Metodo de pago
@@ -501,13 +540,14 @@ class PaymentAggregator(models.Model):
         self.ensure_one()
         
         # Buscar la vista específica si existe
-        view_id = self.env.ref('multiple_payments.view_account_payment_tree_grouped_simple', False)
+        # view_id = self.env.ref('multiple_payments.account_payment_multiple_payments_group_view_tree')
         
         return {
             'name': 'Pagos Agrupados',
             'type': 'ir.actions.act_window',
             'res_model': 'account.payment',
             'view_mode': 'tree,form',
+            "views": [(self.env.ref('multiple_payments.account_payment_multiple_payments_group_view_tree').id, "tree"),(self.env.ref("account.view_account_payment_form").id, "form")],
             'context': {
                 'group_by': ['transaction_type'],
                 # 'search_default_partner_id': self.customer_id.id if self.customer_id else False,

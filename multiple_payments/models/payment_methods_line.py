@@ -263,8 +263,11 @@ class MPPaymentMethodsLine(models.Model):
 
     # Obtenemos la tasa mas actual
     def _getCurrencyRate(self):
+        aggregator_currency = self._getPaymentAggregatorCurrency()
         # Validamos de donde obtener la moneda
-        if self.currency_id.id == self.env.company.currency_id.id:
+        if self.currency_id.id != aggregator_currency.id and self.currency_id.id == self.env.company.currency_id.id:
+            currency = aggregator_currency
+        elif self.currency_id.id == aggregator_currency.id and self.currency_id.id != self.env.company.currency_id.id:
             currency = self.currency_id
         elif self.account_journal_id.currency_id.id == self.env.company.currency_id.id:
             currency = self.env.company.currency_id.id
