@@ -22,6 +22,7 @@
         "views/account_journal_views.xml",
         "views/payment_view.xml",
         "views/account_journal_aggregator_views.xml",
+        "views/account_payment_views.xml",
         "views/ir_menu_views.xml",
         # Reports
     ],
