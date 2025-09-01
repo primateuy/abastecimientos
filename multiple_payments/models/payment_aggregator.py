@@ -1375,6 +1375,7 @@ class PaymentAggregator(models.Model):
         for credit_line in self.account_move_line_payment_agg_ids:
 
             payments = self.env["account.payment"].search([("payment_aggregator_id","=",self.id)])
+            account_partial_reconcile = self.env['account.partial.reconcile']
             # Reconciliar pago con factura
             payment_lines = payments.line_ids.filtered(
                 lambda line: line.account_id.account_type in ['asset_receivable', 'liability_payable'] and not line.reconciled
@@ -1382,10 +1383,15 @@ class PaymentAggregator(models.Model):
             invoice_lines = credit_line.move_id.line_ids.filtered(
                 lambda line: line.account_id.account_type in ['asset_receivable', 'liability_payable'] and not line.reconciled
             )
-            self.env['account.partial.reconcile'].create({
-                'debit_move_id': invoice_lines.id,
-                'credit_move_id': payment_lines.id,
-                'amount': credit_line.payment_aggregator_total_import,   # en moneda de la compañía (UYU)
-                'debit_amount_currency': credit_line.payment_aggregator_total_import,  # moneda de la factura
-                'credit_amount_currency': credit_line.payment_aggregator_total_import,   # moneda del pago
-            })
+
+            partial_reconcile = account_partial_reconcile.search([("debit_move_id","=",invoice_lines.id),("credit_move_id","=",payment_lines.id)],limit=1) 
+
+            if not partial_reconcile:
+                account_partial_reconcile.create({
+                    'debit_move_id': invoice_lines.id,
+                    'credit_move_id': payment_lines.id,
+                    'amount': credit_line.payment_aggregator_total_import,   # en moneda de la compañía (UYU)
+                    'debit_amount_currency': credit_line.payment_aggregator_total_import,  # moneda de la factura
+                    'credit_amount_currency': credit_line.payment_aggregator_total_import,   # moneda del pago
+                    'max_date': self.date
+                })
