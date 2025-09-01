@@ -1013,12 +1013,13 @@ class PaymentAggregator(models.Model):
             # Modificación de asientos con fechas correctas
             amount = payment_method["amount"]
 
-            self._setDebitCreditAmount(
-                payment=payment,
-                amount_in_payment_currency=payment_method["amount"],
-                amount_in_aggregator_currency=amount,
-                payment_method=payment_method
-            )
+            if payment.currency_id.id != self.currency_id.id:
+                self._setDebitCreditAmount(
+                    payment=payment,
+                    amount_in_payment_currency=payment_method["amount"],
+                    amount_in_aggregator_currency=amount,
+                    payment_method=payment_method
+                )
 
             # CORREGIR FECHAS
             # self._fix_payment_dates(payment, payment_date)
