@@ -1,19 +1,20 @@
-# Translation of Odoo Server.
-# This file contains the translation of the following modules:
-# 	* multiple_payments
+# Translation of Odoo Module multiple_payments to Spanish (Argentina)
+# Copyright (C) 2025
+# This file is distributed under the same license as the multiple_payments module.
 #
 msgid ""
 msgstr ""
-"Project-Id-Version: Odoo Server 17.0+e-20250123\n"
+"Project-Id-Version: Odoo 17.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2025-08-28 21:10+0000\n"
-"PO-Revision-Date: 2025-08-28 21:10+0000\n"
-"Last-Translator: \n"
+"POT-Creation-Date: 2025-09-02 12:00+0000\n"
+"PO-Revision-Date: 2025-09-02 12:00+0000\n"
+"Last-Translator: Andres Iglesias <>\n"
 "Language-Team: \n"
+"Language: es_AR\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
-"Content-Transfer-Encoding: \n"
-"Plural-Forms: \n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
 #. module: multiple_payments
 #: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__account_id
