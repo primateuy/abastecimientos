@@ -1008,6 +1008,7 @@ class PaymentAggregator(models.Model):
             _logger.info(payment)
             _logger.info(payment.partner_type)
             _logger.info(self.receiptbook_id.partner_type)
+            _logger.info(payment.currency_id.name)
 
 
             # Modificación de asientos con fechas correctas
@@ -1026,7 +1027,7 @@ class PaymentAggregator(models.Model):
            
             # Publicamos el asiento
             # payment.move_id._post(soft=False)
-            payment.action_post()
+            # payment.action_post()
             # payment._create_paired_internal_transfer_payment()
 
             # payment.paired_internal_transfer_payment_id.write({
@@ -1109,9 +1110,10 @@ class PaymentAggregator(models.Model):
             ], limit=1)
             payment.write({
                 "partner_type": self.receiptbook_id.partner_type,
-                "account_journal_id": account_account.id
+                "account_journal_id": account_account.id,
+                "currency_id": self.currency_id.id
             })
-            payment.action_draft()
+            # payment.action_draft()
             payment.action_post()
 
             _logger.info(payment)
