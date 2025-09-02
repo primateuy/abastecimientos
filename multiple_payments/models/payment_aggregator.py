@@ -1384,26 +1384,26 @@ class PaymentAggregator(models.Model):
                      payment.name, amount_in_payment_currency, amount_company_currency)
 
     def button_reconciliate_payments(self):
+        payments = self.env["account.payment"].search([("payment_aggregator_id","=",self.id)])
         for credit_line in self.account_move_line_payment_agg_ids:
+            for payment in payments:
+                account_partial_reconcile = self.env['account.partial.reconcile']
+                # Reconciliar pago con factura
+                payment_lines = payment.line_ids.filtered(
+                    lambda line: line.account_id.account_type in ['asset_receivable', 'liability_payable'] and not line.reconciled
+                )
+                invoice_lines = credit_line.move_id.line_ids.filtered(
+                    lambda line: line.account_id.account_type in ['asset_receivable', 'liability_payable'] and not line.reconciled
+                )
 
-            payments = self.env["account.payment"].search([("payment_aggregator_id","=",self.id)])
-            account_partial_reconcile = self.env['account.partial.reconcile']
-            # Reconciliar pago con factura
-            payment_lines = payments.line_ids.filtered(
-                lambda line: line.account_id.account_type in ['asset_receivable', 'liability_payable'] and not line.reconciled
-            )
-            invoice_lines = credit_line.move_id.line_ids.filtered(
-                lambda line: line.account_id.account_type in ['asset_receivable', 'liability_payable'] and not line.reconciled
-            )
+                partial_reconcile = account_partial_reconcile.search([("debit_move_id","=",invoice_lines.id),("credit_move_id","=",payment_lines.id)],limit=1) 
 
-            partial_reconcile = account_partial_reconcile.search([("debit_move_id","=",invoice_lines.id),("credit_move_id","=",payment_lines.id)],limit=1) 
-
-            if not partial_reconcile:
-                account_partial_reconcile.create({
-                    'debit_move_id': invoice_lines.id,
-                    'credit_move_id': payment_lines.id,
-                    'amount': credit_line.payment_aggregator_total_import,   # en moneda de la compañía (UYU)
-                    'debit_amount_currency': credit_line.payment_aggregator_total_import,  # moneda de la factura
-                    'credit_amount_currency': credit_line.payment_aggregator_total_import,   # moneda del pago
-                    'max_date': self.date
-                })
+                if not partial_reconcile:
+                    account_partial_reconcile.create({
+                        'debit_move_id': invoice_lines.id,
+                        'credit_move_id': payment_lines.id,
+                        'amount': credit_line.payment_aggregator_total_import,   # en moneda de la compañía (UYU)
+                        'debit_amount_currency': credit_line.payment_aggregator_total_import,  # moneda de la factura
+                        'credit_amount_currency': credit_line.payment_aggregator_total_import,   # moneda del pago
+                        'max_date': self.date
+                    })
