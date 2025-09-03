@@ -132,7 +132,7 @@ class AccountPayment(models.Model):
 
     def _get_destination_account(self):
         """Obtener cuenta de destino según el diario de destino"""
-        destination_journal = self.env['account.journal'].browse(self.destination_journal_id)
+        destination_journal = self.env['account.journal'].browse(self.destination_journal_id.id)
         return destination_journal.default_account_id
 
     # OVERRIDE del método problemático para compatibilidad
