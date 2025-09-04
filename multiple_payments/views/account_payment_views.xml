@@ -1,0 +1,31 @@
+<odoo>
+    <data>
+        <!-- Tree para los pagos agrupados -->
+        <record id="account_payment_multiple_payments_group_view_tree" model="ir.ui.view">
+            <field name="name">account.payment.multiple.payments.group.tree</field>
+            <field name="model">account.payment</field>
+            <field name="arch" type="xml">
+                <tree edit="false" sample="1" decoration-info="state == 'draft'" decoration-muted="state == 'cancel'">
+                    <header>
+                        <button name="action_post" type="object" string="Confirm"/>
+                    </header>
+                    <field name="company_currency_id" column_invisible="True"/>
+                    <field name="suitable_journal_ids" column_invisible="True"/>
+                    <field name="available_payment_method_line_ids" column_invisible="True"/>
+                    <field name="date_mps" readonly="state in ['cancel', 'posted']"/>
+                    <field name="name"/>
+                    <field name="journal_id"/>
+                    <field name="company_id" optional="hide" groups="base.group_multi_company"/>
+                    <field name="payment_method_line_id"/>
+                    <field name="partner_mps_id" string="Customer"/>
+                    <field name="amount_signed" string="Amount in Currency" optional="hide" groups="!base.group_multi_currency"/>
+                    <field name="amount_signed" string="Amount in Currency" optional="show" groups="base.group_multi_currency"/>
+                    <field name="currency_id" string="Payment Currency" optional="hide"/>
+                    <field name="activity_ids" widget="list_activity" optional="hide"/>
+                    <field name="amount_company_currency_signed" widget="monetary" string="Amount" sum="Total"/>
+                    <field name="state" widget="badge" decoration-info="state == 'draft'" decoration-success="state == 'posted'"/>
+                </tree>
+            </field>
+        </record>
+    </data>
+</odoo>

@@ -1,0 +1,1150 @@
+# Translation of Odoo Server.
+# This file contains the translation of the following modules:
+# 	* multiple_payments
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Odoo Server 17.0+e-20250218\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2025-08-30 06:50+0000\n"
+"PO-Revision-Date: 2025-08-30 06:50+0000\n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: \n"
+"Plural-Forms: \n"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__account_id
+msgid "Account"
+msgstr "Cuenta"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_journal_aggregator__account_journal_id
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_methods_line__account_journal_id
+msgid "Account Journal"
+msgstr "Diario"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_aggregator__account_move_line_payment_agg_ids
+msgid "Account Move Line Payment Agg"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__is_account_reconcile
+msgid "Account Reconcile"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__account_root_id
+msgid "Account Root"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,help:multiple_payments.field_account_move_line_payment_aggregator__account_type
+msgid ""
+"Account Type is used for information purpose, to generate country-specific "
+"legal reports, and set the rules to close a fiscal year and generate opening"
+" entries."
+msgstr "" 
+"Tipo de cuenta se usa con propósitos informativos, para generar reportes"
+"legales especificos del país y para establecer las reglas para cerrar el año fiscal"
+"y generar entradas abiertas"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_journal_aggregator__active
+msgid "Active"
+msgstr "Activo"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_aggregator__adenda
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_methods_line__adenda
+msgid "Adenda"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__payment_aggregator_amount_currency
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_aggregator__amount
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_methods_line__amount
+msgid "Amount"
+msgstr "Importe"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__amount_currency
+msgid "Amount in Currency"
+msgstr "Importe en moneda extrangera"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__analytic_distribution
+msgid "Analytic Distribution"
+msgstr "Distribución Analítica"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__analytic_distribution_search
+msgid "Analytic Distribution Search"
+msgstr "Busqueda de Distribución Analítica"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__analytic_precision
+msgid "Analytic Precision"
+msgstr "Presición Analítica"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__analytic_line_ids
+msgid "Analytic lines"
+msgstr "Lineas Analíticas"
+
+#. module: multiple_payments
+#: model_terms:ir.ui.view,arch_db:multiple_payments.payment_aggregator_views_form
+msgid "Apply FIFO"
+msgstr "Aplicar FIFO"
+
+#. module: multiple_payments
+#: model_terms:ir.ui.view,arch_db:multiple_payments.payment_aggregator_views_form
+msgid ""
+"Are you sure you want to confirm the payment group? Once confirmed, payments"
+" will be processed and no uploaded data can be modified."
+msgstr ""
+"¿Está seguro de que quiere confirmar el agrupador de pagos? Una vez confirmado,"
+"los pagos serán procesados y no se podrán modificar"
+
+#. module: multiple_payments
+#: model_terms:ir.ui.view,arch_db:multiple_payments.payment_aggregator_views_form
+msgid "Assign All"
+msgstr "Asignar Todo"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_aggregator__average_rate
+msgid "Average Rate"
+msgstr "Tasa de Cambio Promedio"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__balance
+msgid "Balance"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__tax_base_amount
+msgid "Base Amount"
+msgstr "Importe Base"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__product_uom_category_id
+msgid "Category"
+msgstr "Categoría"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_methods_line__check_bank_id
+msgid "Check Bank"
+msgstr "Banco del Cheque"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_methods_line__check_cash_date
+msgid "Check Cash Date"
+msgstr "Fecha de pago del cheque"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__check_number
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_methods_line__check_number
+msgid "Check Number"
+msgstr "Número del cheque"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_methods_line__check_vat
+msgid "Check Vat"
+msgstr "Identificación del emisor del cheque"
+
+#. module: multiple_payments
+#: model:ir.model.fields,help:multiple_payments.field_account_move_line_payment_aggregator__is_account_reconcile
+msgid ""
+"Check this box if this account allows invoices & payments matching of "
+"journal items."
+msgstr ""
+"Marque esta casilla si esta cuenta permite la conciliación "
+"de facturas y pagos de elementos del diario"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__company_id
+msgid "Company"
+msgstr "Compañía"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__company_currency_id
+msgid "Company Currency"
+msgstr "Modena de la compañía"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__is_storno
+msgid "Company Storno Accounting"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__compute_all_tax
+msgid "Compute All Tax"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__compute_all_tax_dirty
+msgid "Compute All Tax Dirty"
+msgstr ""
+
+#. module: multiple_payments
+#: model_terms:ir.ui.view,arch_db:multiple_payments.payment_aggregator_views_form
+msgid "Confirm"
+msgstr "Confirmar"
+
+#. module: multiple_payments
+#: model:ir.model.fields,help:multiple_payments.field_account_move_line_payment_aggregator__product_uom_category_id
+msgid ""
+"Conversion between Units of Measure can only occur if they belong to the "
+"same category. The conversion will be made based on the ratios."
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_journal_aggregator__create_uid
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__create_uid
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_aggregator__create_uid
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_methods_line__create_uid
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_receipt_books__create_uid
+msgid "Created by"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_journal_aggregator__create_date
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__create_date
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_aggregator__create_date
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_methods_line__create_date
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_receipt_books__create_date
+msgid "Created on"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__credit
+msgid "Credit"
+msgstr "Credito"
+
+#. module: multiple_payments
+#: model:ir.model.fields,help:multiple_payments.field_account_move_line_payment_aggregator__matched_credit_ids
+msgid "Credit journal items that are matched with this journal item."
+msgstr "Artículos del diario de crédito que coinciden con este artículo del diario."
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_aggregator__mps_credits_line_ids
+msgid "Cuentas por Pagar/Cobrar"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__cumulated_balance
+msgid "Cumulated Balance"
+msgstr "Balance Acumulado"
+
+#. module: multiple_payments
+#: model:ir.model.fields,help:multiple_payments.field_account_move_line_payment_aggregator__cumulated_balance
+msgid ""
+"Cumulated balance depending on the domain and the order chosen in the view."
+msgstr ""
+"Saldo acumulado en función del dominio y el orden elegido en la vista."
+
+
+#. module: multiple_payments
+#: model:ir.model,name:multiple_payments.model_res_currency
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__currency_id
+msgid "Currency"
+msgstr "Moneda"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__currency_rate
+msgid "Currency Rate"
+msgstr "Tasa de Cambio"
+
+#. module: multiple_payments
+#: model:ir.model.fields,help:multiple_payments.field_account_move_line_payment_aggregator__currency_rate
+msgid "Currency rate from company currency to document currency."
+msgstr "Tasa de cambio de la moneda de la empresa a la moneda del documento."
+
+#. module: multiple_payments
+#: model:ir.model.fields.selection,name:multiple_payments.selection__mps_receipt_books__partner_type__customer
+msgid "Customer"
+msgstr "Cliente"
+
+#. module: multiple_payments
+#: model:ir.model.fields.selection,name:multiple_payments.selection__account_payment__transaction_type__customer_payment
+msgid "Customer Payment"
+msgstr "Pagos de Cliente"
+
+#. module: multiple_payments
+#: model:ir.ui.menu,name:multiple_payments.general_payments_aggregator_menu
+msgid "Customer or Supplier Receipt"
+msgstr "Recibo de Cliente o Proveedor"
+
+#. module: multiple_payments
+#: model:ir.actions.act_window,name:multiple_payments.mps_receipt_books_customer_views_action
+msgid "Customer's Receiptbooks"
+msgstr "Recibo de pago de Cliente"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__date
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_aggregator__date
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_methods_line__date
+msgid "Date"
+msgstr "Fecha"
+
+#. module: multiple_payments
+#: model:ir.model.fields,help:multiple_payments.field_account_move_line_payment_aggregator__deferred_end_date
+msgid "Date at which the deferred expense/revenue ends"
+msgstr "Fecha en que finaliza el gasto/ingreso diferido"
+
+#. module: multiple_payments
+#: model:ir.model.fields,help:multiple_payments.field_account_move_line_payment_aggregator__deferred_start_date
+msgid "Date at which the deferred expense/revenue starts"
+msgstr "Fecha en que Empieza el gasto/ingreso diferido"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__debit
+msgid "Debit"
+msgstr "Debito"
+
+#. module: multiple_payments
+#: model:ir.model.fields,help:multiple_payments.field_account_move_line_payment_aggregator__matched_debit_ids
+msgid "Debit journal items that are matched with this journal item."
+msgstr "Artículos del diario de debito que coinciden con este artículo del diario."
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_aggregator__debt_allocation
+msgid "Debt Allocation"
+msgstr "Asignación de Deuda"
+
+#. module: multiple_payments
+#: model_terms:ir.ui.view,arch_db:multiple_payments.payment_aggregator_views_form
+msgid "Delete Unassigned"
+msgstr "Eliminar no Asignados"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_aggregator__difference
+msgid "Difference"
+msgstr "Diferencia"
+
+#. module: multiple_payments
+#. odoo-python
+#: code:addons/multiple_payments/models/payment_aggregator.py:0
+#, python-format
+msgid "Difference must be 0 to publish a payments aggregator."
+msgstr "La Diferencia debe ser 0 para publicar el agrupador de pagos"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__discount
+msgid "Discount (%)"
+msgstr "Descuento"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__discount_allocation_dirty
+msgid "Discount Allocation Dirty"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__discount_allocation_key
+msgid "Discount Allocation Key"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__discount_allocation_needed
+msgid "Discount Allocation Needed"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__discount_balance
+msgid "Discount Balance"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__discount_date
+msgid "Discount Date"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__discount_amount_currency
+msgid "Discount amount in Currency"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_journal_aggregator__display_name
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__display_name
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_aggregator__display_name
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_methods_line__display_name
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_receipt_books__display_name
+msgid "Display Name"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__display_type
+msgid "Display Type"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__l10n_latam_document_type_id
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_receipt_books__document_type_id
+msgid "Document Type"
+msgstr "Tipo de documento"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_aggregator__domain_receiptbook_id
+msgid "Domain Receiptbook"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields.selection,name:multiple_payments.selection__mps_payment_aggregator__state__draft
+msgid "Draft"
+msgstr "Borrador"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__date_maturity
+msgid "Due Date"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_receipt_books__enable_reverse_payment
+msgid "Enable Reverse Payment"
+msgstr "Habilitar Pago Inverso"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__deferred_end_date
+msgid "End Date"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__epd_dirty
+msgid "Epd Dirty"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__epd_key
+msgid "Epd Key"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__epd_needed
+msgid "Epd Needed"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_methods_line__exchange_rate
+msgid "Exchange Rate"
+msgstr "Tasa de Cambio"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_methods_line__exchange_rate_visibility
+msgid "Exchange Rate Visibility"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__has_abnormal_deferred_dates
+msgid "Has Abnormal Deferred Dates"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__has_deferred_moves
+msgid "Has Deferred Moves"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_methods_line__have_journal_currency
+msgid "Have Journal Currency"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_journal_aggregator__id
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__id
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_aggregator__id
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_methods_line__id
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_receipt_books__id
+msgid "ID"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields.selection,name:multiple_payments.selection__mps_receipt_books__type__inbound
+msgid "Inbound"
+msgstr "Recibir"
+
+#. module: multiple_payments
+#: model:l10n_latam.document.type,name:multiple_payments.incoming_receipt
+msgid "Incoming Manual Receipt"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,help:multiple_payments.field_account_move_line_payment_aggregator__tax_line_id
+msgid "Indicates that this journal item is a tax line"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_journal__intermediate_diary
+msgid "Intermediate Diary"
+msgstr "Diario Intermedio"
+
+#. module: multiple_payments
+#: model:ir.actions.act_window,name:multiple_payments.account_journal_aggregator_view_action
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_aggregator__account_journal_aggregator_id
+#: model:ir.ui.menu,name:multiple_payments.account_intermediate_journal_menu
+msgid "Intermediate diary"
+msgstr "Diario Intermedio"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__account_internal_group
+msgid "Internal Group"
+msgstr ""
+
+#. module: multiple_payments
+#. odoo-python
+#: code:addons/multiple_payments/models/payment_aggregator.py:0
+#: model:ir.model.fields.selection,name:multiple_payments.selection__account_payment__transaction_type__internal_transfer
+#, python-format
+msgid "Internal Transfer"
+msgstr "Transferencia Interna"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__account_type
+msgid "Internal Type"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__tax_tag_invert
+msgid "Invert Tags"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__invoice_date
+msgid "Invoice/Bill Date"
+msgstr "Fecha de Factura"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_methods_line__is_check
+msgid "Is Check"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_receipt_books__is_public
+msgid "Is Public"
+msgstr "Es Público"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__is_refund
+msgid "Is Refund"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__is_same_currency
+msgid "Is Same Currency"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model,name:multiple_payments.model_account_journal
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__journal_id
+msgid "Journal"
+msgstr "Diario"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__move_id
+msgid "Journal Entry"
+msgstr "Diario"
+
+#. module: multiple_payments
+#: model:ir.model,name:multiple_payments.model_account_move_line
+msgid "Journal Item"
+msgstr "Apunte contable"
+
+#. module: multiple_payments
+#. odoo-python
+#: code:addons/multiple_payments/models/payment_aggregator.py:0
+#, python-format
+msgid "La linea de pago debe contener un diario contable"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__name
+msgid "Label"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_journal_aggregator__write_uid
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__write_uid
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_aggregator__write_uid
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_methods_line__write_uid
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_receipt_books__write_uid
+msgid "Last Updated by"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_journal_aggregator__write_date
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__write_date
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_aggregator__write_date
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_methods_line__write_date
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_receipt_books__write_date
+msgid "Last Updated on"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,help:multiple_payments.field_account_move_line_payment_aggregator__discount_date
+msgid ""
+"Last date at which the discounted amount must be paid in order for the Early"
+" Payment Discount to be granted"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__matched_credit_ids
+msgid "Matched Credits"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__matched_debit_ids
+msgid "Matched Debits"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__full_reconcile_id
+msgid "Matching"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__matching_number
+msgid "Matching #"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,help:multiple_payments.field_account_move_line_payment_aggregator__matching_number
+msgid ""
+"Matching number for this line, 'P' if it is only partially reconcile, or the"
+" name of the full reconcile if it exists."
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_methods_line__memo
+msgid "Memo"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model,name:multiple_payments.model_mps_payment_aggregator
+msgid "Model to save payment aggregator"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model,name:multiple_payments.model_mps_payment_methods_line
+msgid "Model to save the payment methods"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model,name:multiple_payments.model_mps_receipt_books
+msgid "Model to save the receipt books information"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__move_attachment_ids
+msgid "Move Attachment"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_aggregator__mps_payment_methods_line_ids
+msgid "Mps Payment Methods Line"
+msgstr "Métodos de Pago"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_aggregator__name
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_receipt_books__name
+msgid "Name"
+msgstr "Nombre"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__blocked
+msgid "No Follow-up"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__move_name
+msgid "Number"
+msgstr "Número"
+
+#. module: multiple_payments
+#: model_terms:ir.ui.view,arch_db:multiple_payments.payment_aggregator_views_form
+msgid "Open Accounting Notes"
+msgstr "Abrir Apuntes Contables"
+
+#. module: multiple_payments
+#: model_terms:ir.ui.view,arch_db:multiple_payments.payment_aggregator_views_form
+msgid "Open Grouped Payments"
+msgstr "Abrir Pagos Agrupados"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__group_tax_id
+msgid "Originator Group of Taxes"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__payment_id
+msgid "Originator Payment"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__statement_line_id
+msgid "Originator Statement Line"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__tax_line_id
+msgid "Originator Tax"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__tax_repartition_line_id
+msgid "Originator Tax Distribution Line"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__tax_group_id
+msgid "Originator tax group"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields.selection,name:multiple_payments.selection__mps_receipt_books__type__outbound
+msgid "Outbound"
+msgstr "Enviar"
+
+#. module: multiple_payments
+#: model:l10n_latam.document.type,name:multiple_payments.outgoing_receipt
+msgid "Outgoing Manual Receipt"
+msgstr ""
+
+#. module: multiple_payments
+#: model_terms:ir.ui.view,arch_db:multiple_payments.payment_aggregator_views_form
+msgid "Outstanding Credits/Debits"
+msgstr "Créditos/Débitos Pendientes"
+
+#. module: multiple_payments
+#: model_terms:ir.ui.view,arch_db:multiple_payments.view_account_payment_tree_grouped_simple
+msgid "Pagos agrupados"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__partner_id
+msgid "Partner"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_receipt_books__partner_type
+msgid "Partner Type"
+msgstr "Tipo de Cliente"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_aggregator__payment_account
+msgid "Payment Account"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_payment__payment_aggregator_id
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_methods_line__mps_payment_aggregator_id
+msgid "Payment Aggregator"
+msgstr "Agrupador de Pagos"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_methods_line__payment_aggregator_currency_id
+msgid "Payment Aggregator Currency"
+msgstr "Moneda de Agrupador de Pagos"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_methods_line__payment_amount
+msgid "Payment Amount"
+msgstr "Importe del Pago"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__payment_date
+msgid "Payment Date"
+msgstr "Fecha del Pago"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_methods_line__payment_method_line_id
+msgid "Payment Method"
+msgstr "Método de Pago"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_methods_line__payment_method_domain
+msgid "Payment Method Domain"
+msgstr ""
+
+#. module: multiple_payments
+#: model_terms:ir.ui.view,arch_db:multiple_payments.payment_aggregator_views_form
+msgid "Payment Methods"
+msgstr "Métodos de Pago"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_methods_line__payment_type_visibility
+msgid "Payment Type Visibility"
+msgstr ""
+
+#. module: multiple_payments
+#: model_terms:ir.ui.view,arch_db:multiple_payments.payment_aggregator_views_form
+msgid "Payment amount"
+msgstr "Importe del Pago"
+
+#. module: multiple_payments
+#: model_terms:ir.ui.view,arch_db:multiple_payments.payment_aggregator_views_form
+msgid "Payment on account"
+msgstr ""
+
+#. module: multiple_payments
+#: model_terms:ir.ui.view,arch_db:multiple_payments.payment_aggregator_views_form
+msgid "Payment's methods"
+msgstr "Métodos de Pago"
+
+#. module: multiple_payments
+#: model:ir.model,name:multiple_payments.model_account_payment
+msgid "Payments"
+msgstr "Pagos"
+
+#. module: multiple_payments
+#: model:ir.actions.act_window,name:multiple_payments.payments_aggregator_view_action
+msgid "Payments Aggregator"
+msgstr "Agrupador de Pagos"
+
+#. module: multiple_payments
+#: model:ir.actions.act_window,name:multiple_payments.payments_aggregator_customers_view_action
+msgid "Payments Aggregator - Customers"
+msgstr "Agrupador de Pagos - Clientes"
+
+#. module: multiple_payments
+#: model:ir.actions.act_window,name:multiple_payments.payments_aggregator_suppliers_view_action
+msgid "Payments Aggregator - Suppliers"
+msgstr "Agrupador de Pagos - Proveedores"
+
+#. module: multiple_payments
+#: model:ir.ui.menu,name:multiple_payments.customers_payments_aggregator_menu
+#: model:ir.ui.menu,name:multiple_payments.payment_aggregator_parent_menu
+#: model:ir.ui.menu,name:multiple_payments.supplier_payments_aggregator_menu
+msgid "Payments aggregator"
+msgstr "Agrupador de Pagos"
+
+#. module: multiple_payments
+#. odoo-python
+#: code:addons/multiple_payments/models/payment_aggregator.py:0
+#, python-format
+msgid "Payments cannot be created with empty information."
+msgstr "Los pagos no se pueden crear con información vacía"
+
+#. module: multiple_payments
+#. odoo-python
+#: code:addons/multiple_payments/models/account_payment.py:0
+#, python-format
+msgid "Payments created with a payment aggregator cannot be set as draft."
+msgstr "Los pagos creados con un Agrupador de Pagos no pueden ser devueltos a borrador"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__product_id
+msgid "Product"
+msgstr "Producto"
+
+#. module: multiple_payments
+#: model:ir.model.fields.selection,name:multiple_payments.selection__mps_payment_aggregator__state__published
+msgid "Published"
+msgstr "Publicado"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__quantity
+msgid "Quantity"
+msgstr "Cantidad"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_aggregator__receiptbook_id
+msgid "Receiptbook"
+msgstr "Recibo de Pago"
+
+#. module: multiple_payments
+#: model:ir.actions.act_window,name:multiple_payments.mps_receipt_books_views_action
+#: model:ir.ui.menu,name:multiple_payments.customer_receipt_books_menu
+#: model:ir.ui.menu,name:multiple_payments.receipt_books_menu
+#: model:ir.ui.menu,name:multiple_payments.supplier_receipt_books_menu
+msgid "Receiptbooks"
+msgstr "Recibos de Pago"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__reconciled
+msgid "Reconciled"
+msgstr "Reconciliado"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__reconcile_model_id
+msgid "Reconciliation Model"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__ref
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_receipt_books__reference
+msgid "Reference"
+msgstr "Referencia"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__amount_residual
+msgid "Residual Amount"
+msgstr "Importe Residual"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__amount_residual_currency
+msgid "Residual Amount in Currency"
+msgstr "Importe Residual en moneda extrangera"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__sequence
+msgid "Sequence"
+msgstr "secuencia"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__deferred_start_date
+msgid "Start Date"
+msgstr "Fecha de inicio"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_aggregator__state
+msgid "State"
+msgstr "Estatus"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__statement_id
+msgid "Statement"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__parent_state
+msgid "Status"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__price_subtotal
+msgid "Subtotal"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields.selection,name:multiple_payments.selection__mps_receipt_books__partner_type__supplier
+msgid "Supplier"
+msgstr "Proveedor"
+
+#. module: multiple_payments
+#: model:ir.actions.act_window,name:multiple_payments.mps_receipt_books_supplier_views_action
+msgid "Supplier's Receiptbooks"
+msgstr "Recibo de pago de Proveedores"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__tax_tag_ids
+msgid "Tags"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,help:multiple_payments.field_account_move_line_payment_aggregator__tax_tag_ids
+msgid ""
+"Tags assigned to this line by the tax creating it, if any. It determines its"
+" impact on financial reports."
+msgstr ""
+
+#. module: multiple_payments
+#: model_terms:ir.ui.view,arch_db:multiple_payments.mps_receipt_books_views_form
+msgid "Talonario de Recibo de ejemplo"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__tax_key
+msgid "Tax Key"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__tax_calculation_rounding_method
+msgid "Tax calculation rounding method"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,help:multiple_payments.field_account_move_line_payment_aggregator__tax_repartition_line_id
+msgid ""
+"Tax distribution line that caused the creation of this move line, if any"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__tax_ids
+msgid "Taxes"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__term_key
+msgid "Term Key"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,help:multiple_payments.field_account_move_line_payment_aggregator__amount_currency
+msgid ""
+"The amount expressed in an optional other currency if it is a multi-currency"
+" entry."
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,help:multiple_payments.field_account_move_line_payment_aggregator__statement_id
+msgid "The bank statement used for bank reconciliation"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,help:multiple_payments.field_account_move_line_payment_aggregator__quantity
+msgid ""
+"The optional quantity expressed by this line, eg: number of product sold. "
+"The quantity is not a legal requirement but is very useful for some reports."
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,help:multiple_payments.field_account_move_line_payment_aggregator__payment_id
+msgid "The payment that created this entry"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,help:multiple_payments.field_account_move_line_payment_aggregator__amount_residual_currency
+msgid ""
+"The residual amount on a journal item expressed in its currency (possibly "
+"not the company currency)."
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,help:multiple_payments.field_account_move_line_payment_aggregator__amount_residual
+msgid ""
+"The residual amount on a journal item expressed in the company currency."
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,help:multiple_payments.field_account_move_line_payment_aggregator__check_number
+msgid ""
+"The selected journal is configured to print check numbers. If your pre-"
+"printed check paper already has numbers or if the current numbering is "
+"wrong, you can change it in the journal configuration page."
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,help:multiple_payments.field_account_move_line_payment_aggregator__statement_line_id
+msgid "The statement line that created this entry"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,help:multiple_payments.field_account_move_line_payment_aggregator__date_maturity
+msgid ""
+"This field is used for payable and receivable journal entries. You can put "
+"the limit date for the payment of this line."
+msgstr ""
+
+#. module: multiple_payments
+#. odoo-python
+#: code:addons/multiple_payments/models/payment_aggregator.py:0
+#, python-format
+msgid "To make payments you must load the payments in the payment lines."
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__price_total
+msgid "Total"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line__total_import
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__payment_aggregator_total_import
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__total_import
+#: model_terms:ir.ui.view,arch_db:multiple_payments.payment_aggregator_views_form
+msgid "Total Import"
+msgstr "Importe Total"
+
+#. module: multiple_payments
+#: model_terms:ir.ui.view,arch_db:multiple_payments.payment_aggregator_views_form
+msgid "Total Import (External Currency)"
+msgstr "Importe Total en moneda extrangera"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__payment_aggregator_amount_residual
+#: model_terms:ir.ui.view,arch_db:multiple_payments.payment_aggregator_views_form
+msgid "Total Residual Amount"
+msgstr "Importe Residual Total"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_payment__transaction_type
+msgid "Transaction Type"
+msgstr "Tipo de transacción"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__move_type
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_methods_line__payment_type
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_receipt_books__type
+msgid "Type"
+msgstr "Tipo"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__price_unit
+msgid "Unit Price"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__product_uom_id
+msgid "Unit of Measure"
+msgstr ""
+
+#. module: multiple_payments
+#: model_terms:ir.ui.view,arch_db:multiple_payments.payment_aggregator_views_form
+msgid "Update Accounting Notes"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,help:multiple_payments.field_account_move_line_payment_aggregator__is_storno
+msgid ""
+"Utility field to express whether the journal item is subject to storno "
+"accounting"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields.selection,name:multiple_payments.selection__account_payment__transaction_type__vendor_payment
+msgid "Vendor Payment"
+msgstr "Pado de Proveedor"
+
+#. module: multiple_payments
+#: model:ir.model.fields,help:multiple_payments.field_account_move_line_payment_aggregator__blocked
+msgid ""
+"You can check this box to mark this journal item as a litigation with the "
+"associated partner"
+msgstr ""
+
+#. module: multiple_payments
+#. odoo-python
+#: code:addons/multiple_payments/models/account_journal_aggregator.py:0
+#, python-format
+msgid "You can have only one intermediate diary per currency in this company"
+msgstr "Solo puedes tener un diario intermedio con esta moneda en esta compañía"
+
+
+#. module: multiple_payments
+#: model:ir.model,name:multiple_payments.model_account_journal_aggregator
+msgid "account.journal.aggregator"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model,name:multiple_payments.model_account_move_line_payment_aggregator
+msgid "account.move.line.payment.aggregator"
+msgstr ""
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_journal_aggregator__company_id
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_aggregator__company_id
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_receipt_books__company_id
+msgid "company"
+msgstr "Compañía"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_journal_aggregator__currency_id
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_aggregator__currency_id
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_methods_line__currency_id
+msgid "currency"
+msgstr "Moneda"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_mps_payment_aggregator__customer_id
+msgid "customer"
+msgstr "Cliente"
+
+#. module: multiple_payments
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line__payment_aggregator_id
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__account_move_line_id
+#: model:ir.model.fields,field_description:multiple_payments.field_account_move_line_payment_aggregator__payment_aggregator_id
+msgid "payment_aggregator"
+msgstr ""
