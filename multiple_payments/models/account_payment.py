@@ -156,31 +156,48 @@ class AccountPayment(models.Model):
         
     def action_post(self):
         """
-        Override del método action_post para manejar correctamente currency_id
-        y evitar errores de NULL en account_move_line
+        Sobrescribir action_post para preservar currency_rate personalizado
         """
-        _logger.info("========= Antes del action_post ============")
-        _logger.info(self.currency_id)
-        _logger.info(self.currency_id.name if self.currency_id else "None")
-
-        # Asegurar que currency_id nunca sea None antes de procesar
-        for payment in self:
-            if not payment.currency_id:
-                payment.currency_id = payment.company_currency_id
-                _logger.warning(f"Payment {payment.id} no tenía currency_id, asignado company_currency_id: {payment.currency_id.name}")
+        _logger.info("=== action_post EJECUTADO ===")
+        _logger.info("Payment ID: %s", self.id)
+        _logger.info("Currency_rate ANTES de action_post: %s", self.currency_rate)
+        
+        # Guardar el currency_rate personalizado ANTES de cualquier procesamiento
+        custom_currency_rate = self.currency_rate
+        
+        # Ejecutar action_post normal (que incluye tchistorico)
+        result = super().action_post()
+        
+        # Restaurar el currency_rate personalizado DESPUÉS de action_post
+        if custom_currency_rate != 1.0:  # Solo si no es el valor por defecto
+            _logger.info("Restaurando currency_rate personalizado: %s", custom_currency_rate)
+            self.write({
+                'currency_rate': custom_currency_rate
+            })
             
-            # Para transferencias internas, asegurar que destination_journal_id tenga currency_id
-            # if payment.is_internal_transfer and payment.destination_journal_id:
-            #     if not payment.destination_journal_id.currency_id:
-            #         payment.destination_journal_id.currency_id = payment.company_currency_id
-            #         _logger.warning(f"Destination journal {payment.destination_journal_id.id} no tenía currency_id, asignado company_currency_id")
-
-        # Llamar al método padre
-        super().action_post()
-
-        _logger.info("========= Despues del action_post ============")
-        _logger.info(self.currency_id)
-        _logger.info(self.currency_id.name if self.currency_id else "None")
+            # También actualizar el asiento contable
+            if self.move_id:
+                self.move_id.write({
+                    'currency_rate': custom_currency_rate
+                })
+                
+                # Recalcular las líneas del asiento con el currency_rate correcto
+                self._recompute_payment_lines(custom_currency_rate)
+        
+        _logger.info("Currency_rate DESPUÉS de action_post: %s", self.currency_rate)
+        return result
+    
+    def _recompute_payment_lines(self, currency_rate):
+        """
+        Recalcular las líneas del asiento con el currency_rate correcto
+        """
+        if not self.move_id:
+            return
+            
+        _logger.info("Recalculando líneas del asiento con currency_rate: %s", currency_rate)
+        
+        # Aquí puedes agregar la lógica específica para recalcular las líneas
+        # basándote en el currency_rate personalizado
 
     # def _create_internal_transfer_move(self):
     #     """
@@ -278,3 +295,39 @@ class AccountPayment(models.Model):
             self.date_mps = self.payment_aggregator_id.date
         elif self.date_mps:
             self.date = self.date_mps
+
+    @api.depends('currency_id', 'company_id', 'date')
+    def _compute_currency_rate(self):
+        """
+        Sobrescribir _compute_currency_rate para preservar valores personalizados
+        cuando el pago viene de un payment aggregator
+        """
+        for payment in self:
+            # Si el pago viene de un payment aggregator, NO recalcular automáticamente
+            if payment.payment_aggregator_id:
+                _logger.info(f"Preservando currency_rate personalizado para pago {payment.name}: {payment.currency_rate}")
+                # No hacer nada, mantener el valor actual
+                continue
+            
+            # Para pagos normales, usar el comportamiento estándar
+            super(AccountPayment, payment)._compute_currency_rate()
+
+    def write(self, vals):
+        """
+        Sobrescribir write para rastrear cambios en currency_rate
+        """
+        if 'currency_rate' in vals:
+            _logger.info("=== WRITE currency_rate DETECTADO ===")
+            _logger.info("Payment ID: %s", self.id)
+            _logger.info("Currency_rate ANTES: %s", self.currency_rate)
+            _logger.info("Currency_rate NUEVO: %s", vals['currency_rate'])
+            
+            # Solo mostrar stack trace si el valor está cambiando
+            if self.currency_rate != vals['currency_rate']:
+                _logger.info("*** CURRENCY_RATE CAMBIANDO DE %s A %s ***", self.currency_rate, vals['currency_rate'])
+                _logger.info("Stack trace completo:")
+                import traceback
+                for line in traceback.format_stack():
+                    _logger.info(line.strip())
+        
+        return super().write(vals)

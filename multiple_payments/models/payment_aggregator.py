@@ -971,7 +971,7 @@ class PaymentAggregator(models.Model):
             payment_details = self._get_standard_payment()
             payment_details['date'] = payment_date
             payment_details['date_mps'] = payment_date
-            payment_details['amount'] = payment_method["amount"]
+            payment_details['amount'] = payment_method["amount"] if self.currency_id.id != self.env.company.currency_id.id else payment_method["payment_amount"]
             payment_details['amount_destino'] = payment_method["amount"]
             payment_details['payment_type'] = payment_method["payment_type"]
             payment_details['payment_type_mps'] = payment_method["payment_type"]
@@ -981,7 +981,7 @@ class PaymentAggregator(models.Model):
             payment_details['payment_method_line_id'] = payment_method["payment_method_line_id"]["id"]
             payment_details['payment_method_id'] = payment_method["payment_method_line_id"]["payment_method_id"]["id"]
             # payment_details['transaction_type'] = "internal_transfer"
-            payment_details['currency_id'] = self.currency_id.id
+            payment_details['currency_id'] = self.currency_id.id if self.currency_id.id != self.env.company.currency_id.id else payment_method["currency_id"].id
            
             if payment_method["is_check"]:
                 payment_details['l10n_latam_check_number'] = payment_method["check_number"]
@@ -1001,124 +1001,89 @@ class PaymentAggregator(models.Model):
             # Creamos el pago
             payment = self.create_publish_payment(payment_details)
 
-            # payment.write({
-            #     "currency_id": self.currency_id.id
-            # })
-
-            _logger.info(payment)
-            _logger.info(payment.partner_type)
-            _logger.info(self.receiptbook_id.partner_type)
-            _logger.info(payment.currency_id.name)
-
-
-            # Modificación de asientos con fechas correctas
-            amount = payment_method["amount"]
-
-            if payment.currency_id.id != self.currency_id.id:
-                self._setDebitCreditAmount(
-                    payment=payment,
-                    amount_in_payment_currency=payment_method["amount"],
-                    amount_in_aggregator_currency=amount,
-                    payment_method=payment_method
+            # CORREGIDO: Comparar moneda del agrupador vs moneda de la línea del método de pago
+            if payment_method.currency_id.id != self.currency_id.id:
+                # Calcular la tasa de cambio correcta
+                currency_rate = 1.0
+                if payment_method["payment_currency_amount"] and payment_method["amount"]:
+                    if payment_method["currency_id"].id == self.env.company.currency_id.id:
+                        currency_rate = payment_method["payment_currency_amount"] / payment_method["amount"]
+                    else:
+                        currency_rate = payment_method["amount"] / payment_method["payment_currency_amount"]
+                
+                # CORREGIDO: Guardar el currency_rate correcto en una variable
+                # para restaurarlo después de action_post
+                correct_currency_rate = currency_rate
+                
+                # Actualizar las líneas del asiento con los montos correctos
+                self._update_move_lines_with_correct_amounts(
+                    payment, 
+                    payment_method, 
+                    currency_rate
                 )
+                
+                # LOG: Verificar estado antes de actualizar
+                _logger.info("=== ANTES DE ACTUALIZAR CURRENCY_RATE ===")
+                _logger.info("Payment ID: %s", payment.id)
+                _logger.info("Payment currency_rate ANTES: %s", payment.currency_rate)
+                _logger.info("Move ID: %s", payment.move_id.id if payment.move_id else "None")
+                _logger.info("Move currency_rate: %s", payment.move_id.currency_rate if payment.move_id else "None")
+                _logger.info("Currency_rate calculado: %s", currency_rate)
 
-            # CORREGIR FECHAS
-            # self._fix_payment_dates(payment, payment_date)
-           
-            # Publicamos el asiento
-            # payment.move_id._post(soft=False)
-            # payment.action_post()
-            # payment._create_paired_internal_transfer_payment()
+                # CORREGIDO: Actualizar currency_rate del pago directamente
+                # Ya que el método _compute_currency_rate no se ejecuta automáticamente
+                try:
+                    payment.write({
+                        'currency_rate': currency_rate,
+                    })
+                    _logger.info("Payment.write() ejecutado exitosamente")
+                except Exception as e:
+                    _logger.error("Error en payment.write(): %s", str(e))
 
-            # payment.paired_internal_transfer_payment_id.write({
-            #     "payment_type_mps":"inbound" if payment_method["payment_type"] == "outbound" else "outbound",
-            #     "date_mps": payment_date,
-            #     "date": payment_date,
-            # })
-           
-            # CORREGIR FECHAS EN TRANSFERENCIA ESPEJO
-            # self._fix_payment_dates(payment.paired_internal_transfer_payment_id, payment_date)
+                # LOG: Verificar estado después de actualizar
+                _logger.info("=== DESPUÉS DE ACTUALIZAR CURRENCY_RATE ===")
+                _logger.info("Payment currency_rate DESPUÉS: %s", payment.currency_rate)
+                _logger.info("Move currency_rate DESPUÉS: %s", payment.move_id.currency_rate if payment.move_id else "None")
 
-            # check_id = False
+                # CORREGIDO: Llamar action_post y restaurar el valor correcto después
+                payment.action_post()
+                
+                # Restaurar el currency_rate correcto después de action_post
+                _logger.info("Restaurando currency_rate correcto: %s", correct_currency_rate)
+                payment.write({
+                    'currency_rate': correct_currency_rate
+                })
+                
+                # También actualizar el asiento contable
+                if payment.move_id:
+                    payment.move_id.write({
+                        'currency_rate': correct_currency_rate
+                    })
+                for line in payment.move_id.line_ids:
+                    if line.account_id.account_type in ('asset_receivable', 'liability_payable'):
+                        line.write({'account_id': self.get_account()})
+            else:
+                payment.action_post()
+    # Modificación de asientos con fechas correctas
+        amount = payment_method["amount"]
 
-            # if payment_method["is_check"] == False:
-            #     pass
-            #     # self.env.cr.execute("UPDATE account_payment SET is_internal_transfer = %s, partner_id = '%s' WHERE id = %s;" % (True, self.customer_id.id, int(payment.id)))
-            # else:
-            #     # Creamos el cheque con fecha correcta
-            #     check_id = self.env["account.payment"].create({
-            #         "payment_type": payment_method["payment_type"],
-            #         "partner_id": self.customer_id.id,
-            #         "amount": payment_method["payment_amount"],
-            #         "amount_destino": payment_method["payment_amount"],
-            #         "date": payment_date,  # FECHA CORRECTA
-            #         "date_mps": payment_date,
-            #         "journal_id": journal.id,
-            #         "payment_method_line_id": payment_method["payment_method_line_id"]["id"],
-            #         "l10n_latam_check_number": payment_method["check_number"],
-            #         "l10n_latam_check_payment_date": payment_method["check_cash_date"],
-            #         "l10n_latam_check_bank_id": payment_method["check_bank_id"]["id"],
-            #         "l10n_latam_check_issuer_vat": payment_method["check_vat"],
-            #         "l10n_latam_check_current_journal_id": self.account_journal_aggregator_id.account_journal_id.id,
-            #         "is_internal_transfer": False
-            #     })
+        # account_account = self.env["account.journal"].search([
+        #     ('type', '=', 'sale' if self.receiptbook_id.partner_type == "customer" else 'purchase')
+        # ], limit=1)
+        # payment.write({
+        #     "partner_type": self.receiptbook_id.partner_type,
+        #     "account_journal_id": account_account.id,
+        #     "currency_id": self.currency_id.id,
+        #     "amount_total_signed": payment_method["payment_amount"],
+        #     "amount_company_currency_signed": payment_method["payment_amount"],
+        #     # REMOVER: "currency_rate": payment_method["payment_currency_amount"]/payment_method["amount"],
+        # })
+        # payment.action_draft()
+        # payment.action_post()
 
-            #     check_id.write({
-            #         "l10n_latam_check_bank_id": payment_method["check_bank_id"]["id"],
-            #     })
-
-            #     check_id.action_post()
-
-            #     payment.write({
-            #         "l10n_latam_check_mps_id": check_id.id
-            #     })
-
-            # Resto del código de transferencias internas igual...
-            # mirror_payment = payment.paired_internal_transfer_payment_id
-
-            # if payment_method["is_check"] == False:
-            #     self.env.cr.execute("UPDATE account_payment SET is_internal_transfer = %s, partner_id = %s, payment_type = '%s' WHERE paired_internal_transfer_payment_id = %s;" % (
-            #             True,
-            #             self.customer_id.id,
-            #             "inbound" if payment_method["payment_type"] == "outbound" else "outbound",
-            #             int(payment.id)
-            #         )
-            #     )
-            # else:
-            #     self.env.cr.execute(
-            #         "UPDATE account_payment " \
-            #         "SET is_internal_transfer = %s, " \
-            #         "partner_id = %s, " \
-            #         "l10n_latam_check_id = %s " \
-            #         "WHERE paired_internal_transfer_payment_id = %s;" % (True, self.customer_id.id, check_id.id, int(payment.id)))
-
-            # mirror_payment.move_id.button_draft()
-
-            # self._setDebitCreditAmount(
-            #     payment=mirror_payment,
-            #     amount_in_payment_currency=payment_method["payment_amount"],
-            #     amount_in_aggregator_currency=amount,
-            #     payment_method=payment_method,
-            #     is_mirror=True
-            # )
-           
-            # mirror_payment._multiple_payments_action_post()
-            # self.env.cr.execute("UPDATE account_payment SET currency_id = %s WHERE id = %s;" % (self.currency_id.id, int(payment.id)))
-
-            account_account = self.env["account.journal"].search([
-                ('type', '=', 'sale' if self.receiptbook_id.partner_type == "customer" else 'purchase')
-            ], limit=1)
-            payment.write({
-                "partner_type": self.receiptbook_id.partner_type,
-                "account_journal_id": account_account.id,
-                "currency_id": self.currency_id.id
-            })
-            # payment.action_draft()
-            payment.action_post()
-
-            _logger.info(payment)
-            _logger.info(payment.partner_type)
-            _logger.info(self.receiptbook_id.partner_type)
+        _logger.info(payment)
+        _logger.info(payment.partner_type)
+        _logger.info(self.receiptbook_id.partner_type)
 
     def _create_payment_acount(self):
         if self.payment_account > 0:
@@ -1407,3 +1372,66 @@ class PaymentAggregator(models.Model):
                         'credit_amount_currency': credit_line.payment_aggregator_total_import,   # moneda del pago
                         'max_date': self.date
                     })
+
+    def _update_move_lines_with_correct_amounts(self, payment, payment_method, currency_rate):
+        """
+        Actualizar las líneas del asiento contable con los montos correctos
+        basados en la tasa de cambio personalizada
+        CORREGIDO: Usar la moneda del agrupador en lugar de la moneda del método de pago
+        """
+        company_currency = self.env.company.currency_id
+        # CORREGIDO: Usar la moneda del agrupador (que es la moneda del pago)
+        aggregator_currency = self.currency_id
+        
+        # Si la moneda del agrupador es igual a la de la compañía, no hay conversión necesaria
+        if aggregator_currency.id == company_currency.id and payment_method.currency_id.id == company_currency.id:
+            return
+        
+        line_ids = []
+        for line in payment.move_id.line_ids:
+            vals = {}
+            if line.account_id.account_type in ('asset_receivable', 'liability_payable') and aggregator_currency == company_currency:
+                vals.update({'account_id': self.get_account()})
+            if line.debit > 0:
+                # Línea débito
+                # CORREGIDO: amount_currency debe ser el monto en la moneda del agrupador
+                amount_currency = float(payment_method["amount"]) if payment_method.currency_id.id == company_currency.id else float(payment_method["payment_amount"]) # Monto en moneda del agrupador
+                amount_company = amount_currency * currency_rate
+                
+                vals.update({
+                    'debit': amount_company,
+                    'balance': amount_company,
+                    'amount_currency': amount_currency,
+                    'currency_id': payment_method.currency_id.id if aggregator_currency == company_currency else aggregator_currency,  # CORREGIDO: Moneda del agrupador
+                })
+                
+            elif line.credit > 0:
+                # Línea crédito
+                # CORREGIDO: amount_currency debe ser el monto en la moneda del agrupador
+                amount_currency = float(payment_method["amount"]) if payment_method.currency_id.id == company_currency.id else float(payment_method["payment_amount"])  # Monto en moneda del agrupador
+                amount_company = amount_currency * currency_rate
+                
+                vals.update({
+                    'credit': amount_company,
+                    'balance': -amount_company,
+                    'amount_currency': -amount_currency,
+                    'currency_id': payment_method.currency_id.id if aggregator_currency == company_currency else aggregator_currency,  # CORREGIDO: Moneda del agrupador
+                })
+            
+            if vals:
+                line_ids.append((1, line.id, vals))
+
+        if line_ids:
+            payment.move_id.write({'line_ids': line_ids, 'currency_rate': currency_rate})
+
+        _logger.info(f"Updated payment {payment.name} with custom currency_rate: {currency_rate}")
+        _logger.info(f"Payment currency: {aggregator_currency.name}, Amount in currency: {amount_currency}, Amount in company: {amount_company}")
+
+
+    def get_account(self):
+        for rec in self:
+            if rec.receiptbook_id and rec.receiptbook_id.account_journal_id:
+                for line_conf in rec.sudo().receiptbook_id.account_journal_id.account_currency_ids:
+                    if line_conf.currency_id.id == self.currency_id.id:
+                        return line_conf.account_id.id
+            return None
