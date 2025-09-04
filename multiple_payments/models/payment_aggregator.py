@@ -1085,6 +1085,68 @@ class PaymentAggregator(models.Model):
         _logger.info(payment.partner_type)
         _logger.info(self.receiptbook_id.partner_type)
 
+    def _update_move_lines_with_correct_amounts(self, payment, payment_method, currency_rate):
+        """
+        Actualizar las líneas del asiento contable con los montos correctos
+        basados en la tasa de cambio personalizada
+        CORREGIDO: Usar la moneda del agrupador en lugar de la moneda del método de pago
+        """
+        company_currency = self.env.company.currency_id
+        # CORREGIDO: Usar la moneda del agrupador (que es la moneda del pago)
+        aggregator_currency = self.currency_id
+
+        # Si la moneda del agrupador es igual a la de la compañía, no hay conversión necesaria
+        if aggregator_currency.id == company_currency.id and payment_method.currency_id.id == company_currency.id:
+            return
+
+        line_ids = []
+        for line in payment.move_id.line_ids:
+            vals = {}
+            if line.account_id.account_type in (
+            'asset_receivable', 'liability_payable') and aggregator_currency == company_currency:
+                vals.update({'account_id': self.get_account()})
+            if line.debit > 0:
+                # Línea débito
+                # CORREGIDO: amount_currency debe ser el monto en la moneda del agrupador
+                amount_currency = float(
+                    payment_method["amount"]) if payment_method.currency_id.id == company_currency.id else float(
+                    payment_method["payment_amount"])  # Monto en moneda del agrupador
+                amount_company = amount_currency * currency_rate
+
+                vals.update({
+                    'debit': amount_company,
+                    'balance': amount_company,
+                    'amount_currency': amount_currency,
+                    'currency_id': payment_method.currency_id.id if aggregator_currency == company_currency else aggregator_currency,
+                    # CORREGIDO: Moneda del agrupador
+                })
+
+            elif line.credit > 0:
+                # Línea crédito
+                # CORREGIDO: amount_currency debe ser el monto en la moneda del agrupador
+                amount_currency = float(
+                    payment_method["amount"]) if payment_method.currency_id.id == company_currency.id else float(
+                    payment_method["payment_amount"])  # Monto en moneda del agrupador
+                amount_company = amount_currency * currency_rate
+
+                vals.update({
+                    'credit': amount_company,
+                    'balance': -amount_company,
+                    'amount_currency': -amount_currency,
+                    'currency_id': payment_method.currency_id.id if aggregator_currency == company_currency else aggregator_currency,
+                    # CORREGIDO: Moneda del agrupador
+                })
+
+            if vals:
+                line_ids.append((1, line.id, vals))
+
+        if line_ids:
+            payment.move_id.write({'line_ids': line_ids, 'currency_rate': currency_rate})
+
+        _logger.info(f"Updated payment {payment.name} with custom currency_rate: {currency_rate}")
+        _logger.info(
+            f"Payment currency: {aggregator_currency.name}, Amount in currency: {amount_currency}, Amount in company: {amount_company}")
+
     def _create_payment_acount(self):
         if self.payment_account > 0:
             payment_details = self._get_standard_payment()
@@ -1373,60 +1435,308 @@ class PaymentAggregator(models.Model):
                         'max_date': self.date
                     })
 
-    def _update_move_lines_with_correct_amounts(self, payment, payment_method, currency_rate):
+    def button_reconciliate_payments_improved(self):
         """
-        Actualizar las líneas del asiento contable con los montos correctos
-        basados en la tasa de cambio personalizada
-        CORREGIDO: Usar la moneda del agrupador en lugar de la moneda del método de pago
+        MÉTODO MEJORADO: Reconcilia pagos con facturas según payment_aggregator_total_import
+        
+        Este método implementa correctamente la lógica de reconciliación:
+        1. Obtiene todos los pagos del agrupador
+        2. Para cada factura con monto asignado (payment_aggregator_total_import > 0)
+        3. Distribuye los pagos proporcionalmente según los montos asignados
+        4. Reconcilia usando el API estándar de Odoo
         """
-        company_currency = self.env.company.currency_id
-        # CORREGIDO: Usar la moneda del agrupador (que es la moneda del pago)
-        aggregator_currency = self.currency_id
-        
-        # Si la moneda del agrupador es igual a la de la compañía, no hay conversión necesaria
-        if aggregator_currency.id == company_currency.id and payment_method.currency_id.id == company_currency.id:
-            return
-        
-        line_ids = []
-        for line in payment.move_id.line_ids:
-            vals = {}
-            if line.account_id.account_type in ('asset_receivable', 'liability_payable') and aggregator_currency == company_currency:
-                vals.update({'account_id': self.get_account()})
-            if line.debit > 0:
-                # Línea débito
-                # CORREGIDO: amount_currency debe ser el monto en la moneda del agrupador
-                amount_currency = float(payment_method["amount"]) if payment_method.currency_id.id == company_currency.id else float(payment_method["payment_amount"]) # Monto en moneda del agrupador
-                amount_company = amount_currency * currency_rate
-                
-                vals.update({
-                    'debit': amount_company,
-                    'balance': amount_company,
-                    'amount_currency': amount_currency,
-                    'currency_id': payment_method.currency_id.id if aggregator_currency == company_currency else aggregator_currency,  # CORREGIDO: Moneda del agrupador
-                })
-                
-            elif line.credit > 0:
-                # Línea crédito
-                # CORREGIDO: amount_currency debe ser el monto en la moneda del agrupador
-                amount_currency = float(payment_method["amount"]) if payment_method.currency_id.id == company_currency.id else float(payment_method["payment_amount"])  # Monto en moneda del agrupador
-                amount_company = amount_currency * currency_rate
-                
-                vals.update({
-                    'credit': amount_company,
-                    'balance': -amount_company,
-                    'amount_currency': -amount_currency,
-                    'currency_id': payment_method.currency_id.id if aggregator_currency == company_currency else aggregator_currency,  # CORREGIDO: Moneda del agrupador
-                })
+        try:
+            _logger.info(f"=== INICIANDO RECONCILIACIÓN MEJORADA PARA AGRUPADOR {self.name} ===")
             
-            if vals:
-                line_ids.append((1, line.id, vals))
+            # Validar que el agrupador esté en estado publicado
+            if self.state != 'published':
+                raise UserError(_("El agrupador debe estar publicado para reconciliar pagos"))
+            
+            # Obtener todos los pagos confirmados del agrupador
+            payments = self.env["account.payment"].search([
+                ("payment_aggregator_id", "=", self.id),
+                ("state", "=", "posted")
+            ])
+            
+            if not payments:
+                raise UserError(_("No se encontraron pagos confirmados para reconciliar"))
+            
+            # Obtener facturas con monto asignado
+            invoices_to_reconcile = self.account_move_line_payment_agg_ids.filtered(
+                lambda line: line.payment_aggregator_total_import > 0
+            )
+            
+            if not invoices_to_reconcile:
+                raise UserError(_("No hay facturas con montos asignados para reconciliar"))
+            
+            _logger.info(f"Pagos encontrados: {len(payments)}")
+            _logger.info(f"Facturas a reconciliar: {len(invoices_to_reconcile)}")
+            
+            # Calcular el monto total asignado a facturas
+            total_assigned_amount = sum(invoices_to_reconcile.mapped('payment_aggregator_total_import'))
+            total_payments_amount = sum(payments.mapped('amount'))
+            
+            _logger.info(f"Monto total asignado a facturas: {total_assigned_amount}")
+            _logger.info(f"Monto total de pagos: {total_payments_amount}")
+            
+            # Validar que los montos coincidan (con tolerancia de centavos)
+            if abs(total_assigned_amount - total_payments_amount) > 0.01:
+                _logger.warning(f"Diferencia en montos: Asignado={total_assigned_amount}, Pagos={total_payments_amount}")
+            
+            # Procesar cada factura individualmente
+            reconciliation_results = []
+            
+            for invoice_line in invoices_to_reconcile:
+                result = self._reconcile_invoice_with_payments(
+                    invoice_line, 
+                    payments, 
+                    total_assigned_amount
+                )
+                reconciliation_results.append(result)
+            
+            # Resumen de resultados
+            successful_reconciliations = [r for r in reconciliation_results if r['success']]
+            failed_reconciliations = [r for r in reconciliation_results if not r['success']]
+            
+            _logger.info(f"=== RESUMEN DE RECONCILIACIÓN ===")
+            _logger.info(f"Reconciliaciones exitosas: {len(successful_reconciliations)}")
+            _logger.info(f"Reconciliaciones fallidas: {len(failed_reconciliations)}")
+            
+            if failed_reconciliations:
+                failed_invoices = [r['invoice_name'] for r in failed_reconciliations]
+                _logger.warning(f"Facturas con errores: {failed_invoices}")
+            
+            # Actualizar estados de facturas
+            self._update_invoice_payment_states()
+            
+            _logger.info(f"=== RECONCILIACIÓN COMPLETADA PARA AGRUPADOR {self.name} ===")
+            
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': _('Reconciliación Completada'),
+                    'message': _(f'Se procesaron {len(successful_reconciliations)} facturas exitosamente. '
+                               f'{len(failed_reconciliations)} facturas con errores.'),
+                    'type': 'success' if not failed_reconciliations else 'warning',
+                    'sticky': True,
+                }
+            }
+            
+        except Exception as e:
+            _logger.error(f"Error en reconciliación mejorada: {str(e)}")
+            raise UserError(f"Error durante la reconciliación: {str(e)}")
 
-        if line_ids:
-            payment.move_id.write({'line_ids': line_ids, 'currency_rate': currency_rate})
+    def _reconcile_invoice_with_payments(self, invoice_line, payments, total_assigned_amount):
+        """
+        Reconcilia una factura específica con los pagos disponibles
+        
+        Args:
+            invoice_line: Línea de factura del agrupador (account.move.line.payment.aggregator)
+            payments: Recordset de pagos disponibles
+            total_assigned_amount: Monto total asignado a todas las facturas
+            
+        Returns:
+            dict: Resultado de la reconciliación
+        """
+        try:
+            invoice_move = invoice_line.move_id
+            assigned_amount = invoice_line.payment_aggregator_total_import
+            
+            _logger.info(f"Procesando factura {invoice_move.name} con monto asignado: {assigned_amount}")
+            
+            # Obtener líneas de factura pendientes de reconciliación
+            invoice_move_lines = invoice_move.line_ids.filtered(
+                lambda line: line.account_id.account_type in ['asset_receivable', 'liability_payable']
+                and not line.reconciled
+                and abs(line.amount_residual) > 0
+            )
+            
+            if not invoice_move_lines:
+                return {
+                    'success': False,
+                    'invoice_name': invoice_move.name,
+                    'error': 'No se encontraron líneas de factura pendientes de reconciliación'
+                }
+            
+            # Distribuir pagos proporcionalmente para esta factura
+            remaining_to_reconcile = assigned_amount
+            reconciled_amount = 0
+            
+            for payment in payments:
+                if remaining_to_reconcile <= 0.01:  # Ya se reconcilió todo
+                    break
+                
+                # Calcular la proporción de este pago que corresponde a esta factura
+                if total_assigned_amount > 0:
+                    payment_proportion = assigned_amount / total_assigned_amount
+                else:
+                    payment_proportion = 1.0 / len(payments)  # Distribuir equitativamente
+                
+                # Monto de este pago que se debe asignar a esta factura
+                payment_amount_for_invoice = payment.amount * payment_proportion
+                
+                # No exceder el monto restante por reconciliar
+                amount_to_reconcile = min(payment_amount_for_invoice, remaining_to_reconcile)
+                
+                if amount_to_reconcile > 0.01:  # Solo procesar si hay monto significativo
+                    success = self._reconcile_specific_invoice_amount(
+                        payment, 
+                        invoice_move, 
+                        amount_to_reconcile
+                    )
+                    
+                    if success:
+                        reconciled_amount += amount_to_reconcile
+                        remaining_to_reconcile -= amount_to_reconcile
+                        _logger.info(f"Reconciliado {amount_to_reconcile} del pago {payment.name} con factura {invoice_move.name}")
+                    else:
+                        _logger.warning(f"Falló reconciliación de {amount_to_reconcile} del pago {payment.name} con factura {invoice_move.name}")
+            
+            # Verificar si se reconcilió completamente
+            if remaining_to_reconcile > 0.01:
+                _logger.warning(f"Factura {invoice_move.name}: Falta reconciliar {remaining_to_reconcile}")
+            
+            return {
+                'success': True,
+                'invoice_name': invoice_move.name,
+                'assigned_amount': assigned_amount,
+                'reconciled_amount': reconciled_amount,
+                'remaining_amount': remaining_to_reconcile
+            }
+            
+        except Exception as e:
+            _logger.error(f"Error reconciliando factura {invoice_line.move_id.name}: {str(e)}")
+            return {
+                'success': False,
+                'invoice_name': invoice_line.move_id.name,
+                'error': str(e)
+            }
 
-        _logger.info(f"Updated payment {payment.name} with custom currency_rate: {currency_rate}")
-        _logger.info(f"Payment currency: {aggregator_currency.name}, Amount in currency: {amount_currency}, Amount in company: {amount_company}")
+    def _update_invoice_payment_states(self):
+        """
+        Actualiza los estados de pago de todas las facturas del agrupador
+        """
+        try:
+            for invoice_line in self.account_move_line_payment_agg_ids:
+                invoice_move = invoice_line.move_id
+                if invoice_move:
+                    # Recalcular el estado de pago de la factura
+                    invoice_move._compute_payment_state()
+                    _logger.info(f"Estado de pago actualizado para factura {invoice_move.name}: {invoice_move.payment_state}")
+                    
+        except Exception as e:
+            _logger.error(f"Error actualizando estados de facturas: {str(e)}")
 
+    def _get_payment_distribution_for_invoice(self, invoice_line, payments, total_assigned_amount):
+        """
+        Calcula cómo distribuir los pagos para una factura específica
+        
+        Returns:
+            list: Lista de tuplas (payment, amount_to_assign)
+        """
+        assigned_amount = invoice_line.payment_aggregator_total_import
+        distribution = []
+        
+        for payment in payments:
+            # Calcular proporción de este pago para esta factura
+            if total_assigned_amount > 0:
+                proportion = assigned_amount / total_assigned_amount
+            else:
+                proportion = 1.0 / len(self.account_move_line_payment_agg_ids.filtered(
+                    lambda l: l.payment_aggregator_total_import > 0
+                ))
+            
+            amount_to_assign = payment.amount * proportion
+            
+            if amount_to_assign > 0.01:  # Solo incluir montos significativos
+                distribution.append((payment, amount_to_assign))
+        
+        return distribution
+
+    def button_validate_reconciliation_setup(self):
+        """
+        Método auxiliar para validar que la configuración de reconciliación esté correcta
+        antes de ejecutar la reconciliación
+        """
+        try:
+            _logger.info(f"Validando configuración de reconciliación para agrupador {self.name}")
+            
+            # Validar estado del agrupador
+            if self.state != 'published':
+                raise ValidationError(_("El agrupador debe estar publicado"))
+            
+            # Validar pagos
+            payments = self.env["account.payment"].search([
+                ("payment_aggregator_id", "=", self.id),
+                ("state", "=", "posted")
+            ])
+            
+            if not payments:
+                raise ValidationError(_("No hay pagos confirmados asociados al agrupador"))
+            
+            # Validar facturas con asignación
+            invoices_with_assignment = self.account_move_line_payment_agg_ids.filtered(
+                lambda line: line.payment_aggregator_total_import > 0
+            )
+            
+            if not invoices_with_assignment:
+                raise ValidationError(_("No hay facturas con montos asignados"))
+            
+            # Validar montos
+            total_assigned = sum(invoices_with_assignment.mapped('payment_aggregator_total_import'))
+            total_payments = sum(payments.mapped('amount'))
+            
+            if abs(total_assigned - total_payments) > 0.01:
+                raise ValidationError(_(
+                    f"Los montos no coinciden:\n"
+                    f"Total asignado a facturas: {total_assigned}\n"
+                    f"Total de pagos: {total_payments}\n"
+                    f"Diferencia: {abs(total_assigned - total_payments)}"
+                ))
+            
+            # Validar que las facturas no estén ya completamente reconciliadas
+            already_paid_invoices = []
+            for invoice_line in invoices_with_assignment:
+                invoice_move = invoice_line.move_id
+                if invoice_move.payment_state == 'paid':
+                    already_paid_invoices.append(invoice_move.name)
+            
+            if already_paid_invoices:
+                _logger.warning(f"Facturas ya pagadas: {already_paid_invoices}")
+            
+            validation_result = {
+                'payments_count': len(payments),
+                'invoices_count': len(invoices_with_assignment),
+                'total_assigned': total_assigned,
+                'total_payments': total_payments,
+                'already_paid_invoices': already_paid_invoices
+            }
+            
+            _logger.info(f"Validación exitosa: {validation_result}")
+            
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': _('Validación Exitosa'),
+                    'message': _(
+                        f'Configuración válida:\n'
+                        f'• {len(payments)} pagos confirmados\n'
+                        f'• {len(invoices_with_assignment)} facturas con asignación\n'
+                        f'• Montos coinciden: ${total_assigned}\n'
+                        f'{"• Algunas facturas ya están pagadas" if already_paid_invoices else ""}'
+                    ),
+                    'type': 'success',
+                    'sticky': True,
+                }
+            }
+            
+        except ValidationError as ve:
+            raise ve
+        except Exception as e:
+            _logger.error(f"Error en validación: {str(e)}")
+            raise UserError(f"Error durante la validación: {str(e)}")
 
     def get_account(self):
         for rec in self:
@@ -1435,3 +1745,2063 @@ class PaymentAggregator(models.Model):
                     if line_conf.currency_id.id == self.currency_id.id:
                         return line_conf.account_id.id
             return None
+
+    def button_reconciliate_payments_advanced(self):
+        """
+        MÉTODO AVANZADO: Reconcilia pagos con facturas manejando diferentes monedas y cuentas
+        
+        Este método resuelve los problemas de:
+        1. Diferentes monedas entre pagos y facturas
+        2. Diferentes cuentas contables (pesos vs USD)
+        3. Reconciliaciones parciales complejas
+        """
+        try:
+            _logger.info(f"=== INICIANDO RECONCILIACIÓN AVANZADA PARA AGRUPADOR {self.name} ===")
+            
+            # Validar que el agrupador esté en estado publicado
+            if self.state != 'published':
+                raise UserError(_("El agrupador debe estar publicado para reconciliar pagos"))
+            
+            # Obtener todos los pagos confirmados del agrupador
+            payments = self.env["account.payment"].search([
+                ("payment_aggregator_id", "=", self.id),
+                ("state", "=", "posted")
+            ])
+            
+            if not payments:
+                raise UserError(_("No se encontraron pagos confirmados para reconciliar"))
+            
+            # Obtener facturas con monto asignado
+            invoices_to_reconcile = self.account_move_line_payment_agg_ids.filtered(
+                lambda line: line.payment_aggregator_total_import > 0
+            )
+            
+            if not invoices_to_reconcile:
+                raise UserError(_("No hay facturas con montos asignados para reconciliar"))
+            
+            _logger.info(f"Pagos encontrados: {len(payments)}")
+            _logger.info(f"Facturas a reconciliar: {len(invoices_to_reconcile)}")
+            
+            # Calcular el monto total asignado a facturas
+            total_assigned_amount = sum(invoices_to_reconcile.mapped('payment_aggregator_total_import'))
+            total_payments_amount = sum(payments.mapped('amount'))
+            
+            _logger.info(f"Monto total asignado a facturas: {total_assigned_amount}")
+            _logger.info(f"Monto total de pagos: {total_payments_amount}")
+            
+            # Procesar cada factura individualmente con reconciliación avanzada
+            reconciliation_results = []
+            
+            for invoice_line in invoices_to_reconcile:
+                result = self._reconcile_invoice_advanced(
+                    invoice_line, 
+                    payments, 
+                    total_assigned_amount
+                )
+                reconciliation_results.append(result)
+            
+            # Resumen de resultados
+            successful_reconciliations = [r for r in reconciliation_results if r['success']]
+            failed_reconciliations = [r for r in reconciliation_results if not r['success']]
+            
+            _logger.info(f"=== RESUMEN DE RECONCILIACIÓN AVANZADA ===")
+            _logger.info(f"Reconciliaciones exitosas: {len(successful_reconciliations)}")
+            _logger.info(f"Reconciliaciones fallidas: {len(failed_reconciliations)}")
+            
+            if failed_reconciliations:
+                failed_invoices = [r['invoice_name'] for r in failed_reconciliations]
+                _logger.warning(f"Facturas con errores: {failed_invoices}")
+            
+            # Actualizar estados de facturas
+            self._update_invoice_payment_states()
+            
+            _logger.info(f"=== RECONCILIACIÓN AVANZADA COMPLETADA PARA AGRUPADOR {self.name} ===")
+            
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': _('Reconciliación Avanzada Completada'),
+                    'message': _(f'Se procesaron {len(successful_reconciliations)} facturas exitosamente. '
+                               f'{len(failed_reconciliations)} facturas con errores.'),
+                    'type': 'success' if not failed_reconciliations else 'warning',
+                    'sticky': True,
+                }
+            }
+            
+        except Exception as e:
+            _logger.error(f"Error en reconciliación avanzada: {str(e)}")
+            raise UserError(f"Error durante la reconciliación avanzada: {str(e)}")
+
+    def _reconcile_invoice_advanced(self, invoice_line, payments, total_assigned_amount):
+        """
+        Reconcilia una factura específica con los pagos usando reconciliación avanzada
+        
+        Args:
+            invoice_line: Línea de factura del agrupador (account.move.line.payment.aggregator)
+            payments: Recordset de pagos disponibles
+            total_assigned_amount: Monto total asignado a todas las facturas
+            
+        Returns:
+            dict: Resultado de la reconciliación
+        """
+        try:
+            invoice_move = invoice_line.move_id
+            assigned_amount = invoice_line.payment_aggregator_total_import
+            
+            _logger.info(f"Procesando factura {invoice_move.name} con monto asignado: {assigned_amount}")
+            _logger.info(f"Moneda de la factura: {invoice_move.currency_id.name}")
+            
+            # Obtener líneas de factura pendientes de reconciliación
+            invoice_move_lines = invoice_move.line_ids.filtered(
+                lambda line: line.account_id.account_type in ['asset_receivable', 'liability_payable']
+                and not line.reconciled
+                and abs(line.amount_residual) > 0
+            )
+            
+            if not invoice_move_lines:
+                return {
+                    'success': False,
+                    'invoice_name': invoice_move.name,
+                    'error': 'No se encontraron líneas de factura pendientes de reconciliación'
+                }
+            
+            _logger.info(f"Líneas de factura encontradas: {len(invoice_move_lines)}")
+            for line in invoice_move_lines:
+                _logger.info(f"  - Cuenta: {line.account_id.code} {line.account_id.name}, Moneda: {line.currency_id.name if line.currency_id else 'Sin moneda'}")
+            
+            # Distribuir pagos proporcionalmente para esta factura
+            remaining_to_reconcile = assigned_amount
+            reconciled_amount = 0
+            
+            for payment in payments:
+                if remaining_to_reconcile <= 0.01:  # Ya se reconcilió todo
+                    break
+                
+                _logger.info(f"Procesando pago {payment.name} - Moneda: {payment.currency_id.name}")
+                
+                # Calcular la proporción de este pago que corresponde a esta factura
+                if total_assigned_amount > 0:
+                    payment_proportion = assigned_amount / total_assigned_amount
+                else:
+                    payment_proportion = 1.0 / len(payments)  # Distribuir equitativamente
+                
+                # Monto de este pago que se debe asignar a esta factura
+                payment_amount_for_invoice = payment.amount * payment_proportion
+                
+                # No exceder el monto restante por reconciliar
+                amount_to_reconcile = min(payment_amount_for_invoice, remaining_to_reconcile)
+                
+                if amount_to_reconcile > 0.01:  # Solo procesar si hay monto significativo
+                    success = self._reconcile_with_currency_handling(
+                        payment, 
+                        invoice_move, 
+                        amount_to_reconcile
+                    )
+                    
+                    if success:
+                        reconciled_amount += amount_to_reconcile
+                        remaining_to_reconcile -= amount_to_reconcile
+                        _logger.info(f"✓ Reconciliado {amount_to_reconcile} del pago {payment.name} con factura {invoice_move.name}")
+                    else:
+                        _logger.warning(f"✗ Falló reconciliación de {amount_to_reconcile} del pago {payment.name} con factura {invoice_move.name}")
+            
+            # Verificar si se reconcilió completamente
+            if remaining_to_reconcile > 0.01:
+                _logger.warning(f"Factura {invoice_move.name}: Falta reconciliar {remaining_to_reconcile}")
+            
+            return {
+                'success': True,
+                'invoice_name': invoice_move.name,
+                'assigned_amount': assigned_amount,
+                'reconciled_amount': reconciled_amount,
+                'remaining_amount': remaining_to_reconcile
+            }
+            
+        except Exception as e:
+            _logger.error(f"Error reconciliando factura {invoice_line.move_id.name}: {str(e)}")
+            return {
+                'success': False,
+                'invoice_name': invoice_line.move_id.name,
+                'error': str(e)
+            }
+
+    def _reconcile_with_currency_handling(self, payment, invoice_move, amount_to_reconcile):
+        """
+        Reconcilia un pago con una factura manejando diferentes monedas y cuentas
+        
+        Args:
+            payment: Pago a reconciliar
+            invoice_move: Factura a reconciliar
+            amount_to_reconcile: Monto a reconciliar
+            
+        Returns:
+            bool: True si la reconciliación fue exitosa
+        """
+        try:
+            # Obtener líneas de pago pendientes de reconciliación
+            payment_lines = payment.line_ids.filtered(
+                lambda line: line.account_id.account_type in ['asset_receivable', 'liability_payable']
+                and not line.reconciled
+                and abs(line.amount_residual) > 0
+            )
+            
+            # Obtener líneas de factura pendientes de reconciliación
+            invoice_lines = invoice_move.line_ids.filtered(
+                lambda line: line.account_id.account_type in ['asset_receivable', 'liability_payable']
+                and not line.reconciled
+                and abs(line.amount_residual) > 0
+            )
+            
+            if not payment_lines or not invoice_lines:
+                _logger.warning(f"No se encontraron líneas para reconciliar: pago {payment.name} con factura {invoice_move.name}")
+                return False
+            
+            _logger.info(f"Intentando reconciliar pago {payment.name} con factura {invoice_move.name}")
+            _logger.info(f"Líneas de pago: {len(payment_lines)}")
+            _logger.info(f"Líneas de factura: {len(invoice_lines)}")
+            
+            # ESTRATEGIA 1: Intentar reconciliación directa con todas las líneas
+            try:
+                _logger.info("Estrategia 1: Reconciliación directa con todas las líneas")
+                (payment_lines + invoice_lines).reconcile()
+                _logger.info("✓ Reconciliación directa exitosa")
+                return True
+            except Exception as e1:
+                _logger.warning(f"Estrategia 1 falló: {str(e1)}")
+            
+            # ESTRATEGIA 2: Reconciliación línea por línea
+            try:
+                _logger.info("Estrategia 2: Reconciliación línea por línea")
+                for payment_line in payment_lines:
+                    for invoice_line in invoice_lines:
+                        try:
+                            # Verificar que las cuentas sean compatibles
+                            if self._are_accounts_compatible(payment_line.account_id, invoice_line.account_id):
+                                _logger.info(f"Reconciliando línea de pago {payment_line.id} con línea de factura {invoice_line.id}")
+                                (payment_line + invoice_line).reconcile()
+                                _logger.info("✓ Reconciliación línea por línea exitosa")
+                                return True
+                        except Exception as e2:
+                            _logger.warning(f"Error reconciliando líneas específicas: {str(e2)}")
+                            continue
+            except Exception as e2:
+                _logger.warning(f"Estrategia 2 falló: {str(e2)}")
+            
+            # ESTRATEGIA 3: Crear reconciliación parcial manual
+            try:
+                _logger.info("Estrategia 3: Reconciliación parcial manual")
+                return self._create_manual_partial_reconcile(payment_lines, invoice_lines, amount_to_reconcile)
+            except Exception as e3:
+                _logger.warning(f"Estrategia 3 falló: {str(e3)}")
+            
+            # ESTRATEGIA 4: Reconciliación por monto residual
+            try:
+                _logger.info("Estrategia 4: Reconciliación por monto residual")
+                return self._reconcile_by_residual_amount(payment_lines, invoice_lines, amount_to_reconcile)
+            except Exception as e4:
+                _logger.warning(f"Estrategia 4 falló: {str(e4)}")
+            
+            _logger.error(f"Todas las estrategias de reconciliación fallaron para pago {payment.name} con factura {invoice_move.name}")
+            return False
+            
+        except Exception as e:
+            _logger.error(f"Error en reconciliación con manejo de monedas: {str(e)}")
+            return False
+
+    def _are_accounts_compatible(self, account1, account2):
+        """
+        Verifica si dos cuentas son compatibles para reconciliación
+        
+        Args:
+            account1: Primera cuenta
+            account2: Segunda cuenta
+            
+        Returns:
+            bool: True si las cuentas son compatibles
+        """
+        try:
+            # Verificar que ambas cuentas sean del mismo tipo
+            if account1.account_type != account2.account_type:
+                return False
+            
+            # Verificar que ambas cuentas sean de cuentas por cobrar/pagar
+            if account1.account_type not in ['asset_receivable', 'liability_payable']:
+                return False
+            
+            # Verificar que ambas cuentas pertenezcan al mismo partner (si aplica)
+            # Esto es opcional, pero puede ayudar en algunos casos
+            
+            return True
+            
+        except Exception as e:
+            _logger.warning(f"Error verificando compatibilidad de cuentas: {str(e)}")
+            return False
+
+    def _create_manual_partial_reconcile(self, payment_lines, invoice_lines, amount_to_reconcile):
+        """
+        Crea una reconciliación parcial manual usando el modelo account.partial.reconcile
+        
+        Args:
+            payment_lines: Líneas de pago
+            invoice_lines: Líneas de factura
+            amount_to_reconcile: Monto a reconciliar
+            
+        Returns:
+            bool: True si la reconciliación fue exitosa
+        """
+        try:
+            # Usar la primera línea de cada tipo
+            payment_line = payment_lines[0]
+            invoice_line = invoice_lines[0]
+            
+            # Determinar cuál es débito y cuál es crédito
+            if payment_line.debit > 0:
+                debit_line = payment_line
+                credit_line = invoice_line
+            else:
+                debit_line = invoice_line
+                credit_line = payment_line
+            
+            # Crear la reconciliación parcial sin el campo amount_currency que causa error
+            partial_rec_vals = {
+                'amount': amount_to_reconcile,
+                'debit_move_id': debit_line.id,
+                'credit_move_id': credit_line.id,
+            }
+            
+            # Solo agregar currency_id si ambas líneas tienen la misma moneda
+            if (payment_line.currency_id and invoice_line.currency_id and 
+                payment_line.currency_id.id == invoice_line.currency_id.id):
+                partial_rec_vals['currency_id'] = payment_line.currency_id.id
+            
+            partial_rec = self.env['account.partial.reconcile'].create(partial_rec_vals)
+            
+            _logger.info(f"✓ Reconciliación parcial manual creada: {partial_rec.id}")
+            return True
+            
+        except Exception as e:
+            _logger.error(f"Error creando reconciliación parcial manual: {str(e)}")
+            return False
+
+    def _reconcile_by_residual_amount(self, payment_lines, invoice_lines, amount_to_reconcile):
+        """
+        Reconcilia basándose en el monto residual disponible
+        
+        Args:
+            payment_lines: Líneas de pago
+            invoice_lines: Líneas de factura
+            amount_to_reconcile: Monto a reconciliar
+            
+        Returns:
+            bool: True si la reconciliación fue exitosa
+        """
+        try:
+            for payment_line in payment_lines:
+                for invoice_line in invoice_lines:
+                    # Calcular el monto máximo que se puede reconciliar
+                    max_payment_amount = abs(payment_line.amount_residual)
+                    max_invoice_amount = abs(invoice_line.amount_residual)
+                    max_reconcile = min(max_payment_amount, max_invoice_amount, amount_to_reconcile)
+                    
+                    if max_reconcile > 0.01:  # Solo procesar si hay monto significativo
+                        try:
+                            # Intentar reconciliación directa
+                            (payment_line + invoice_line).reconcile()
+                            _logger.info(f"✓ Reconciliación por monto residual exitosa: {max_reconcile}")
+                            return True
+                        except Exception as e:
+                            _logger.warning(f"Error en reconciliación por monto residual: {str(e)}")
+                            continue
+            
+            return False
+            
+        except Exception as e:
+            _logger.error(f"Error en reconciliación por monto residual: {str(e)}")
+            return False
+
+    def button_reconciliate_payments_final(self):
+        """
+        MÉTODO FINAL: Reconcilia pagos con facturas corrigiendo problemas de cuentas
+        
+        Este método resuelve el problema específico de:
+        1. Facturas en USD usando cuenta de pesos (110400)
+        2. Pagos en USD usando cuenta de USD (110401)
+        3. Necesidad de reconciliar entre cuentas diferentes
+        """
+        try:
+            _logger.info(f"=== INICIANDO RECONCILIACIÓN FINAL PARA AGRUPADOR {self.name} ===")
+            
+            # Validar que el agrupador esté en estado publicado
+            if self.state != 'published':
+                raise UserError(_("El agrupador debe estar publicado para reconciliar pagos"))
+            
+            # Obtener todos los pagos confirmados del agrupador
+            payments = self.env["account.payment"].search([
+                ("payment_aggregator_id", "=", self.id),
+                ("state", "=", "posted")
+            ])
+            
+            if not payments:
+                raise UserError(_("No se encontraron pagos confirmados para reconciliar"))
+            
+            # Obtener facturas con monto asignado
+            invoices_to_reconcile = self.account_move_line_payment_agg_ids.filtered(
+                lambda line: line.payment_aggregator_total_import > 0
+            )
+            
+            if not invoices_to_reconcile:
+                raise UserError(_("No hay facturas con montos asignados para reconciliar"))
+            
+            _logger.info(f"Pagos encontrados: {len(payments)}")
+            _logger.info(f"Facturas a reconciliar: {len(invoices_to_reconcile)}")
+            
+            # Procesar cada factura individualmente con reconciliación final
+            reconciliation_results = []
+            
+            for invoice_line in invoices_to_reconcile:
+                result = self._reconcile_invoice_final(
+                    invoice_line, 
+                    payments
+                )
+                reconciliation_results.append(result)
+            
+            # Resumen de resultados
+            successful_reconciliations = [r for r in reconciliation_results if r['success']]
+            failed_reconciliations = [r for r in reconciliation_results if not r['success']]
+            
+            _logger.info(f"=== RESUMEN DE RECONCILIACIÓN FINAL ===")
+            _logger.info(f"Reconciliaciones exitosas: {len(successful_reconciliations)}")
+            _logger.info(f"Reconciliaciones fallidas: {len(failed_reconciliations)}")
+            
+            if failed_reconciliations:
+                failed_invoices = [r['invoice_name'] for r in failed_reconciliations]
+                _logger.warning(f"Facturas con errores: {failed_invoices}")
+            
+            # Actualizar estados de facturas
+            self._update_invoice_payment_states()
+            
+            _logger.info(f"=== RECONCILIACIÓN FINAL COMPLETADA PARA AGRUPADOR {self.name} ===")
+            
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': _('Reconciliación Final Completada'),
+                    'message': _(f'Se procesaron {len(successful_reconciliations)} facturas exitosamente. '
+                               f'{len(failed_reconciliations)} facturas con errores.'),
+                    'type': 'success' if not failed_reconciliations else 'warning',
+                    'sticky': True,
+                }
+            }
+            
+        except Exception as e:
+            _logger.error(f"Error en reconciliación final: {str(e)}")
+            raise UserError(f"Error durante la reconciliación final: {str(e)}")
+
+    def _reconcile_invoice_final(self, invoice_line, payments):
+        """
+        Reconcilia una factura específica con los pagos usando reconciliación final
+        
+        Args:
+            invoice_line: Línea de factura del agrupador (account.move.line.payment.aggregator)
+            payments: Recordset de pagos disponibles
+            
+        Returns:
+            dict: Resultado de la reconciliación
+        """
+        try:
+            invoice_move = invoice_line.move_id
+            assigned_amount = invoice_line.payment_aggregator_total_import
+            
+            _logger.info(f"Procesando factura {invoice_move.name} con monto asignado: {assigned_amount}")
+            _logger.info(f"Moneda de la factura: {invoice_move.currency_id.name}")
+            
+            # Obtener líneas de factura pendientes de reconciliación
+            invoice_move_lines = invoice_move.line_ids.filtered(
+                lambda line: line.account_id.account_type in ['asset_receivable', 'liability_payable']
+                and not line.reconciled
+                and abs(line.amount_residual) > 0
+            )
+            
+            if not invoice_move_lines:
+                return {
+                    'success': False,
+                    'invoice_name': invoice_move.name,
+                    'error': 'No se encontraron líneas de factura pendientes de reconciliación'
+                }
+            
+            _logger.info(f"Líneas de factura encontradas: {len(invoice_move_lines)}")
+            for line in invoice_move_lines:
+                _logger.info(f"  - Cuenta: {line.account_id.code} {line.account_id.name}, Moneda: {line.currency_id.name if line.currency_id else 'Sin moneda'}")
+            
+            # Buscar pagos que coincidan con la moneda de la factura
+            matching_payments = payments.filtered(
+                lambda p: p.currency_id.id == invoice_move.currency_id.id
+            )
+            
+            if not matching_payments:
+                _logger.warning(f"No se encontraron pagos en la moneda {invoice_move.currency_id.name} para la factura {invoice_move.name}")
+                return {
+                    'success': False,
+                    'invoice_name': invoice_move.name,
+                    'error': f'No hay pagos en la moneda {invoice_move.currency_id.name}'
+                }
+            
+            _logger.info(f"Pagos coincidentes encontrados: {len(matching_payments)}")
+            
+            # Intentar reconciliación directa con pagos de la misma moneda
+            reconciled_amount = 0
+            remaining_to_reconcile = assigned_amount
+            
+            for payment in matching_payments:
+                if remaining_to_reconcile <= 0.01:
+                    break
+                
+                _logger.info(f"Procesando pago {payment.name} - Moneda: {payment.currency_id.name}")
+                
+                # Calcular el monto a reconciliar de este pago
+                payment_amount_for_invoice = min(payment.amount, remaining_to_reconcile)
+                
+                if payment_amount_for_invoice > 0.01:
+                    success = self._reconcile_with_account_correction(
+                        payment, 
+                        invoice_move, 
+                        payment_amount_for_invoice
+                    )
+                    
+                    if success:
+                        reconciled_amount += payment_amount_for_invoice
+                        remaining_to_reconcile -= payment_amount_for_invoice
+                        _logger.info(f"✓ Reconciliado {payment_amount_for_invoice} del pago {payment.name} con factura {invoice_move.name}")
+                    else:
+                        _logger.warning(f"✗ Falló reconciliación de {payment_amount_for_invoice} del pago {payment.name} con factura {invoice_move.name}")
+            
+            # Verificar si se reconcilió completamente
+            if remaining_to_reconcile > 0.01:
+                _logger.warning(f"Factura {invoice_move.name}: Falta reconciliar {remaining_to_reconcile}")
+            
+            return {
+                'success': True,
+                'invoice_name': invoice_move.name,
+                'assigned_amount': assigned_amount,
+                'reconciled_amount': reconciled_amount,
+                'remaining_amount': remaining_to_reconcile
+            }
+            
+        except Exception as e:
+            _logger.error(f"Error reconciliando factura {invoice_line.move_id.name}: {str(e)}")
+            return {
+                'success': False,
+                'invoice_name': invoice_line.move_id.name,
+                'error': str(e)
+            }
+
+    def _reconcile_with_account_correction(self, payment, invoice_move, amount_to_reconcile):
+        """
+        Reconcilia un pago con una factura corrigiendo problemas de cuentas
+        
+        Args:
+            payment: Pago a reconciliar
+            invoice_move: Factura a reconciliar
+            amount_to_reconcile: Monto a reconciliar
+            
+        Returns:
+            bool: True si la reconciliación fue exitosa
+        """
+        try:
+            # Obtener líneas de pago pendientes de reconciliación
+            payment_lines = payment.line_ids.filtered(
+                lambda line: line.account_id.account_type in ['asset_receivable', 'liability_payable']
+                and not line.reconciled
+                and abs(line.amount_residual) > 0
+            )
+            
+            # Obtener líneas de factura pendientes de reconciliación
+            invoice_lines = invoice_move.line_ids.filtered(
+                lambda line: line.account_id.account_type in ['asset_receivable', 'liability_payable']
+                and not line.reconciled
+                and abs(line.amount_residual) > 0
+            )
+            
+            if not payment_lines or not invoice_lines:
+                _logger.warning(f"No se encontraron líneas para reconciliar: pago {payment.name} con factura {invoice_move.name}")
+                return False
+            
+            _logger.info(f"Intentando reconciliar pago {payment.name} con factura {invoice_move.name}")
+            _logger.info(f"Líneas de pago: {len(payment_lines)}")
+            _logger.info(f"Líneas de factura: {len(invoice_lines)}")
+            
+            # ESTRATEGIA 1: Intentar reconciliación directa
+            try:
+                _logger.info("Estrategia 1: Reconciliación directa")
+                (payment_lines + invoice_lines).reconcile()
+                _logger.info("✓ Reconciliación directa exitosa")
+                return True
+            except Exception as e1:
+                _logger.warning(f"Estrategia 1 falló: {str(e1)}")
+            
+            # ESTRATEGIA 2: Corregir cuentas y reconciliar
+            try:
+                _logger.info("Estrategia 2: Corrección de cuentas y reconciliación")
+                return self._reconcile_with_account_fix(payment_lines, invoice_lines, amount_to_reconcile)
+            except Exception as e2:
+                _logger.warning(f"Estrategia 2 falló: {str(e2)}")
+            
+            # ESTRATEGIA 3: Crear asiento de ajuste
+            try:
+                _logger.info("Estrategia 3: Crear asiento de ajuste")
+                return self._create_adjustment_entry(payment, invoice_move, amount_to_reconcile)
+            except Exception as e3:
+                _logger.warning(f"Estrategia 3 falló: {str(e3)}")
+            
+            _logger.error(f"Todas las estrategias de reconciliación fallaron para pago {payment.name} con factura {invoice_move.name}")
+            return False
+            
+        except Exception as e:
+            _logger.error(f"Error en reconciliación con corrección de cuentas: {str(e)}")
+            return False
+
+    def _reconcile_with_account_fix(self, payment_lines, invoice_lines, amount_to_reconcile):
+        """
+        Reconcilia corrigiendo temporalmente las cuentas
+        
+        Args:
+            payment_lines: Líneas de pago
+            invoice_lines: Líneas de factura
+            amount_to_reconcile: Monto a reconciliar
+            
+        Returns:
+            bool: True si la reconciliación fue exitosa
+        """
+        try:
+            # Obtener las cuentas correctas
+            payment_account = payment_lines[0].account_id
+            invoice_account = invoice_lines[0].account_id
+            
+            _logger.info(f"Cuenta de pago: {payment_account.code} - {payment_account.name}")
+            _logger.info(f"Cuenta de factura: {invoice_account.code} - {invoice_account.name}")
+            
+            # Si las cuentas son diferentes, intentar encontrar una cuenta común
+            if payment_account.id != invoice_account.id:
+                # Buscar una cuenta que sea compatible con ambas
+                common_account = self._find_common_account(payment_account, invoice_account)
+                
+                if common_account:
+                    _logger.info(f"Usando cuenta común: {common_account.code} - {common_account.name}")
+                    
+                    # Temporalmente cambiar las cuentas a la cuenta común
+                    payment_lines.write({'account_id': common_account.id})
+                    invoice_lines.write({'account_id': common_account.id})
+                    
+                    try:
+                        # Intentar reconciliación
+                        (payment_lines + invoice_lines).reconcile()
+                        _logger.info("✓ Reconciliación con cuenta común exitosa")
+                        return True
+                    except Exception as e:
+                        _logger.warning(f"Error en reconciliación con cuenta común: {str(e)}")
+                    finally:
+                        # Restaurar las cuentas originales
+                        payment_lines.write({'account_id': payment_account.id})
+                        invoice_lines.write({'account_id': invoice_account.id})
+            
+            return False
+            
+        except Exception as e:
+            _logger.error(f"Error en reconciliación con corrección de cuentas: {str(e)}")
+            return False
+
+    def _find_common_account(self, account1, account2):
+        """
+        Busca una cuenta común que sea compatible con ambas cuentas
+        
+        Args:
+            account1: Primera cuenta
+            account2: Segunda cuenta
+            
+        Returns:
+            account: Cuenta común encontrada o None
+        """
+        try:
+            # Buscar cuentas del mismo tipo y partner
+            common_accounts = self.env['account.account'].search([
+                ('account_type', '=', account1.account_type),
+                ('company_id', '=', self.env.company.id),
+                ('reconcile', '=', True)
+            ])
+            
+            # Si hay cuentas comunes, usar la primera
+            if common_accounts:
+                return common_accounts[0]
+            
+            return None
+            
+        except Exception as e:
+            _logger.warning(f"Error buscando cuenta común: {str(e)}")
+            return None
+
+    def _create_adjustment_entry(self, payment, invoice_move, amount_to_reconcile):
+        """
+        Crea un asiento de ajuste para reconciliar entre cuentas diferentes
+        
+        Args:
+            payment: Pago a reconciliar
+            invoice_move: Factura a reconciliar
+            amount_to_reconcile: Monto a reconciliar
+            
+        Returns:
+            bool: True si la reconciliación fue exitosa
+        """
+        try:
+            _logger.info(f"Creando asiento de ajuste para reconciliar {amount_to_reconcile}")
+            
+            # Obtener las cuentas
+            payment_account = payment.line_ids.filtered(
+                lambda line: line.account_id.account_type in ['asset_receivable', 'liability_payable']
+            )[0].account_id
+            
+            invoice_account = invoice_move.line_ids.filtered(
+                lambda line: line.account_id.account_type in ['asset_receivable', 'liability_payable']
+            )[0].account_id
+            
+            # Crear asiento de ajuste
+            adjustment_move = self.env['account.move'].create({
+                'move_type': 'entry',
+                'date': self.date,
+                'ref': f'Ajuste de reconciliación - {self.name}',
+                'line_ids': [
+                    (0, 0, {
+                        'account_id': payment_account.id,
+                        'debit': amount_to_reconcile,
+                        'credit': 0,
+                        'partner_id': self.customer_id.id,
+                        'currency_id': payment.currency_id.id,
+                    }),
+                    (0, 0, {
+                        'account_id': invoice_account.id,
+                        'debit': 0,
+                        'credit': amount_to_reconcile,
+                        'partner_id': self.customer_id.id,
+                        'currency_id': invoice_move.currency_id.id,
+                    }),
+                ]
+            })
+            
+            # Confirmar el asiento
+            adjustment_move.action_post()
+            
+            _logger.info(f"✓ Asiento de ajuste creado: {adjustment_move.name}")
+            
+            # Ahora reconciliar las líneas originales con el asiento de ajuste
+            payment_lines = payment.line_ids.filtered(
+                lambda line: line.account_id.account_type in ['asset_receivable', 'liability_payable']
+                and not line.reconciled
+            )
+            
+            invoice_lines = invoice_move.line_ids.filtered(
+                lambda line: line.account_id.account_type in ['asset_receivable', 'liability_payable']
+                and not line.reconciled
+            )
+            
+            adjustment_lines = adjustment_move.line_ids.filtered(
+                lambda line: line.account_id.account_type in ['asset_receivable', 'liability_payable']
+            )
+            
+            # Reconciliar pago con asiento de ajuste
+            if payment_lines and adjustment_lines:
+                (payment_lines + adjustment_lines).reconcile()
+                _logger.info("✓ Pago reconciliado con asiento de ajuste")
+            
+            # Reconciliar factura con asiento de ajuste
+            if invoice_lines and adjustment_lines:
+                (invoice_lines + adjustment_lines).reconcile()
+                _logger.info("✓ Factura reconciliada con asiento de ajuste")
+            
+            return True
+            
+        except Exception as e:
+            _logger.error(f"Error creando asiento de ajuste: {str(e)}")
+            return False
+
+    def button_reconciliate_payments_sequential(self):
+        """
+        MÉTODO SECUENCIAL: Reconcilia pagos con facturas de forma secuencial
+        
+        Comportamiento correcto:
+        1. Toma el primer pago y lo reconcilia con facturas hasta agotar su monto
+        2. Luego toma el segundo pago y lo reconcilia con las facturas restantes
+        3. Continúa hasta procesar todos los pagos
+        """
+        try:
+            _logger.info(f"=== INICIANDO RECONCILIACIÓN SECUENCIAL PARA AGRUPADOR {self.name} ===")
+            
+            # Validar que el agrupador esté en estado publicado
+            if self.state != 'published':
+                raise UserError(_("El agrupador debe estar publicado para reconciliar pagos"))
+            
+            # Obtener todos los pagos confirmados del agrupador
+            payments = self.env["account.payment"].search([
+                ("payment_aggregator_id", "=", self.id),
+                ("state", "=", "posted")
+            ])
+            
+            if not payments:
+                raise UserError(_("No se encontraron pagos confirmados para reconciliar"))
+            
+            # Obtener facturas con monto asignado
+            invoices_to_reconcile = self.account_move_line_payment_agg_ids.filtered(
+                lambda line: line.payment_aggregator_total_import > 0
+            )
+            
+            if not invoices_to_reconcile:
+                raise UserError(_("No hay facturas con montos asignados para reconciliar"))
+            
+            _logger.info(f"Pagos encontrados: {len(payments)}")
+            _logger.info(f"Facturas a reconciliar: {len(invoices_to_reconcile)}")
+            
+            # Calcular el monto total asignado a facturas
+            total_assigned_amount = sum(invoices_to_reconcile.mapped('payment_aggregator_total_import'))
+            total_payments_amount = sum(payments.mapped('amount'))
+            
+            _logger.info(f"Monto total asignado a facturas: {total_assigned_amount}")
+            _logger.info(f"Monto total de pagos: {total_payments_amount}")
+            
+            # Procesar cada pago secuencialmente
+            reconciliation_results = []
+            
+            for payment in payments:
+                _logger.info(f"=== PROCESANDO PAGO {payment.name} - Monto: {payment.amount} - Moneda: {payment.currency_id.name} ===")
+                
+                # CORREGIDO: Obtener facturas restantes antes de cada pago
+                remaining_invoices = self.account_move_line_payment_agg_ids.filtered(
+                    lambda line: line.payment_aggregator_total_import > 0
+                )
+                
+                _logger.info(f"Facturas restantes antes del pago {payment.name}: {len(remaining_invoices)}")
+                
+                # Distribuir este pago secuencialmente entre las facturas restantes
+                result = self._distribute_payment_sequentially(
+                    payment, 
+                    remaining_invoices
+                )
+                reconciliation_results.append(result)
+                
+                _logger.info(f"Facturas restantes después del pago {payment.name}: {len(self.account_move_line_payment_agg_ids.filtered(lambda line: line.payment_aggregator_total_import > 0))}")
+            
+            # Resumen de resultados
+            successful_reconciliations = [r for r in reconciliation_results if r['success']]
+            failed_reconciliations = [r for r in reconciliation_results if not r['success']]
+            
+            _logger.info(f"=== RESUMEN DE RECONCILIACIÓN SECUENCIAL ===")
+            _logger.info(f"Pagos procesados exitosamente: {len(successful_reconciliations)}")
+            _logger.info(f"Pagos con errores: {len(failed_reconciliations)}")
+            
+            if failed_reconciliations:
+                failed_payments = [r['payment_name'] for r in failed_reconciliations]
+                _logger.warning(f"Pagos con errores: {failed_payments}")
+            
+            # Actualizar estados de facturas
+            self._update_invoice_payment_states()
+            
+            _logger.info(f"=== RECONCILIACIÓN SECUENCIAL COMPLETADA PARA AGRUPADOR {self.name} ===")
+            
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': _('Reconciliación Secuencial Completada'),
+                    'message': _(f'Se procesaron {len(successful_reconciliations)} pagos exitosamente. '
+                               f'{len(failed_reconciliations)} pagos con errores.'),
+                    'type': 'success' if not failed_reconciliations else 'warning',
+                    'sticky': True,
+                }
+            }
+            
+        except Exception as e:
+            _logger.error(f"Error en reconciliación secuencial: {str(e)}")
+            raise UserError(f"Error durante la reconciliación secuencial: {str(e)}")
+
+    def _distribute_payment_sequentially(self, payment, remaining_invoices):
+        """
+        Distribuye un pago secuencialmente entre las facturas restantes
+        
+        Args:
+            payment: Pago a distribuir
+            remaining_invoices: Facturas restantes por reconciliar
+            
+        Returns:
+            dict: Resultado de la distribución
+        """
+        try:
+            _logger.info(f"Distribuyendo pago {payment.name} secuencialmente")
+            
+            # Obtener líneas de pago pendientes de reconciliación
+            payment_lines = payment.line_ids.filtered(
+                lambda line: line.account_id.account_type in ['asset_receivable', 'liability_payable']
+                and not line.reconciled
+                and abs(line.amount_residual) > 0
+            )
+            
+            if not payment_lines:
+                _logger.warning(f"No se encontraron líneas de pago pendientes para {payment.name}")
+                return {
+                    'success': False,
+                    'payment_name': payment.name,
+                    'error': 'No hay líneas de pago pendientes de reconciliación'
+                }
+            
+            _logger.info(f"Líneas de pago pendientes: {len(payment_lines)}")
+            
+            # Distribuir el pago secuencialmente entre las facturas restantes
+            reconciled_amount = 0
+            remaining_payment_amount = payment.amount
+            invoices_processed = []
+            
+            # CORREGIDO: Iterar sobre cada factura individualmente
+            for invoice_line in remaining_invoices:
+                if remaining_payment_amount <= 0.01:
+                    _logger.info(f"Pago {payment.name} agotado, no se puede reconciliar más facturas")
+                    break
+                
+                # CORREGIDO: Acceder al campo del registro individual
+                assigned_amount = invoice_line.payment_aggregator_total_import
+                if assigned_amount <= 0:
+                    _logger.info(f"Factura {invoice_line.move_id.name} ya está completamente reconciliada, saltando")
+                    continue
+                
+                # Monto a reconciliar: el menor entre el monto restante del pago y el monto asignado a la factura
+                amount_to_reconcile = min(remaining_payment_amount, assigned_amount)
+                
+                if amount_to_reconcile > 0.01:
+                    _logger.info(f"Reconciliando {amount_to_reconcile} del pago {payment.name} con factura {invoice_line.move_id.name}")
+                    
+                    success = self._reconcile_payment_with_invoice_sequential(
+                        payment, 
+                        invoice_line.move_id, 
+                        amount_to_reconcile
+                    )
+                    
+                    if success:
+                        reconciled_amount += amount_to_reconcile
+                        remaining_payment_amount -= amount_to_reconcile
+                        
+                        # CORREGIDO: Actualizar el monto asignado a la factura usando write()
+                        invoice_line.write({
+                            'payment_aggregator_total_import': assigned_amount - amount_to_reconcile
+                        })
+                        
+                        invoices_processed.append({
+                            'invoice_name': invoice_line.move_id.name,
+                            'amount_reconciled': amount_to_reconcile,
+                            'remaining_assigned': assigned_amount - amount_to_reconcile
+                        })
+                        
+                        _logger.info(f"✓ Reconciliado {amount_to_reconcile} del pago {payment.name} con factura {invoice_line.move_id.name}")
+                        _logger.info(f"  - Monto restante del pago: {remaining_payment_amount}")
+                        _logger.info(f"  - Monto restante asignado a la factura: {assigned_amount - amount_to_reconcile}")
+                    else:
+                        _logger.warning(f"✗ Falló reconciliación de {amount_to_reconcile} del pago {payment.name} con factura {invoice_line.move_id.name}")
+            
+            # Verificar si se reconcilió completamente
+            if remaining_payment_amount > 0.01:
+                _logger.warning(f"Pago {payment.name}: Falta reconciliar {remaining_payment_amount}")
+            
+            return {
+                'success': True,
+                'payment_name': payment.name,
+                'total_amount': payment.amount,
+                'reconciled_amount': reconciled_amount,
+                'remaining_amount': remaining_payment_amount,
+                'invoices_processed': invoices_processed
+            }
+            
+        except Exception as e:
+            _logger.error(f"Error distribuyendo pago {payment.name} secuencialmente: {str(e)}")
+            return {
+                'success': False,
+                'payment_name': payment.name,
+                'error': str(e)
+            }
+
+    def _reconcile_payment_with_invoice_sequential(self, payment, invoice_move, amount_to_reconcile):
+        """
+        Reconcilia un pago específico con una factura específica de forma secuencial
+        
+        Args:
+            payment: Pago a reconciliar
+            invoice_move: Factura a reconciliar
+            amount_to_reconcile: Monto a reconciliar
+            
+        Returns:
+            bool: True si la reconciliación fue exitosa
+        """
+        try:
+            # CORREGIDO: Buscar líneas de pago que tengan saldo residual (no solo no reconciliadas)
+            payment_lines = payment.line_ids.filtered(
+                lambda line: line.account_id.account_type in ['asset_receivable', 'liability_payable']
+                and abs(line.amount_residual) > 0.01  # Cambiado: buscar por saldo residual
+            )
+            
+            # Obtener líneas de factura pendientes de reconciliación
+            invoice_lines = invoice_move.line_ids.filtered(
+                lambda line: line.account_id.account_type in ['asset_receivable', 'liability_payable']
+                and not line.reconciled
+                and abs(line.amount_residual) > 0
+            )
+            
+            if not payment_lines or not invoice_lines:
+                _logger.warning(f"No se encontraron líneas para reconciliar: pago {payment.name} con factura {invoice_move.name}")
+                _logger.warning(f"Líneas de pago con saldo residual: {len(payment_lines)}")
+                _logger.warning(f"Líneas de factura pendientes: {len(invoice_lines)}")
+                return False
+            
+            _logger.info(f"Reconciliando pago {payment.name} con factura {invoice_move.name}")
+            _logger.info(f"Líneas de pago con saldo residual: {len(payment_lines)}")
+            _logger.info(f"Líneas de factura: {len(invoice_lines)}")
+            
+            # ESTRATEGIA 1: Intentar reconciliación directa
+            try:
+                _logger.info("Estrategia 1: Reconciliación directa")
+                (payment_lines + invoice_lines).reconcile()
+                _logger.info("✓ Reconciliación directa exitosa")
+                return True
+            except Exception as e1:
+                _logger.warning(f"Estrategia 1 falló: {str(e1)}")
+            
+            # ESTRATEGIA 2: Reconciliación con corrección de cuentas
+            try:
+                _logger.info("Estrategia 2: Reconciliación con corrección de cuentas")
+                return self._reconcile_with_account_correction_sequential(payment_lines, invoice_lines, amount_to_reconcile)
+            except Exception as e2:
+                _logger.warning(f"Estrategia 2 falló: {str(e2)}")
+            
+            # ESTRATEGIA 3: Crear asiento de ajuste
+            try:
+                _logger.info("Estrategia 3: Crear asiento de ajuste")
+                return self._create_adjustment_entry_sequential(payment, invoice_move, amount_to_reconcile)
+            except Exception as e3:
+                _logger.warning(f"Estrategia 3 falló: {str(e3)}")
+            
+            _logger.error(f"Todas las estrategias de reconciliación fallaron para pago {payment.name} con factura {invoice_move.name}")
+            return False
+            
+        except Exception as e:
+            _logger.error(f"Error en reconciliación secuencial de pago con factura: {str(e)}")
+            return False
+
+    def _reconcile_with_account_correction_sequential(self, payment_lines, invoice_lines, amount_to_reconcile):
+        """
+        Reconcilia con corrección de cuentas de forma secuencial
+        
+        Args:
+            payment_lines: Líneas de pago
+            invoice_lines: Líneas de factura
+            amount_to_reconcile: Monto a reconciliar
+            
+        Returns:
+            bool: True si la reconciliación fue exitosa
+        """
+        try:
+            # Obtener las cuentas
+            payment_account = payment_lines[0].account_id
+            invoice_account = invoice_lines[0].account_id
+            
+            _logger.info(f"Cuenta de pago: {payment_account.code} - {payment_account.name}")
+            _logger.info(f"Cuenta de factura: {invoice_account.code} - {invoice_account.name}")
+            
+            # Si las cuentas son diferentes, crear un asiento de ajuste
+            if payment_account.id != invoice_account.id:
+                _logger.info("Cuentas diferentes, creando asiento de ajuste")
+                return self._create_adjustment_entry_sequential(
+                    payment_lines[0].move_id.payment_id, 
+                    invoice_lines[0].move_id, 
+                    amount_to_reconcile
+                )
+            
+            return False
+            
+        except Exception as e:
+            _logger.error(f"Error en reconciliación con corrección de cuentas secuencial: {str(e)}")
+            return False
+
+    def _create_adjustment_entry_sequential(self, payment, invoice_move, amount_to_reconcile):
+        """
+        Crea un asiento de ajuste para reconciliar entre cuentas diferentes con manejo correcto de monedas
+        
+        Args:
+            payment: Pago a reconciliar
+            invoice_move: Factura a reconciliar
+            amount_to_reconcile: Monto a reconciliar
+            
+        Returns:
+            dict: Resultado de la creación del asiento
+        """
+        try:
+            _logger.info(f"Creando asiento de ajuste secuencial para reconciliar {amount_to_reconcile}")
+            
+            # CORREGIDO: Usar account_type en lugar de internal_type para Odoo 17
+            payment_lines = payment.move_id.line_ids.filtered(
+                lambda l: l.account_id.account_type in ['asset_receivable', 'liability_payable']
+                and abs(l.amount_residual) > 0
+            )
+            invoice_lines = invoice_move.line_ids.filtered(
+                lambda l: l.account_id.account_type in ['asset_receivable', 'liability_payable']
+                and abs(l.amount_residual) > 0
+            )
+            
+            if not payment_lines or not invoice_lines:
+                return {'success': False, 'message': 'No se encontraron líneas válidas'}
+            
+            payment_line = payment_lines[0]
+            invoice_line = invoice_lines[0]
+            
+            # CORREGIDO: Usar la moneda del pago como moneda principal
+            currency_id = payment.currency_id.id
+            company_currency_id = payment.company_id.currency_id.id
+            
+            # CORREGIDO: Calcular el monto en la moneda de la empresa
+            if currency_id != company_currency_id:
+                # Si el pago está en USD y la empresa en UYU, convertir
+                amount_company_currency = payment.currency_id._convert(
+                    amount_to_reconcile, 
+                    payment.company_id.currency_id, 
+                    payment.company_id, 
+                    payment.date
+                )
+            else:
+                amount_company_currency = amount_to_reconcile
+            
+            # Crear asiento de ajuste
+            adjustment_vals = {
+                'ref': f'Ajuste para reconciliación {payment.name} - {invoice_move.name}',
+                'date': payment.date,
+                'journal_id': payment.journal_id.id,
+                'company_id': payment.company_id.id,
+                'currency_id': currency_id,  # CORREGIDO: Usar moneda del pago
+                'line_ids': [
+                    # Línea de débito - Cuenta de la factura (pesos)
+                    (0, 0, {
+                        'account_id': invoice_line.account_id.id,
+                        'partner_id': invoice_line.partner_id.id,
+                        'name': f'Ajuste para {invoice_move.name}',
+                        'debit': amount_company_currency,
+                        'credit': 0.0,
+                        'amount_currency': amount_to_reconcile,  # CORREGIDO: Monto en USD
+                        'currency_id': currency_id,  # CORREGIDO: Moneda USD
+                        'date_maturity': invoice_line.date_maturity,
+                    }),
+                    # Línea de crédito - Cuenta del pago (USD)
+                    (0, 0, {
+                        'account_id': payment_line.account_id.id,
+                        'partner_id': payment_line.partner_id.id,
+                        'name': f'Ajuste para {payment.name}',
+                        'debit': 0.0,
+                        'credit': amount_company_currency,
+                        'amount_currency': -amount_to_reconcile,  # CORREGIDO: Monto en USD
+                        'currency_id': currency_id,  # CORREGIDO: Moneda USD
+                        'date_maturity': payment_line.date_maturity,
+                    }),
+                ]
+            }
+            
+            # Crear el asiento de ajuste
+            adjustment_move = self.env['account.move'].create(adjustment_vals)
+            adjustment_move.action_post()
+            
+            _logger.info(f"✓ Asiento de ajuste secuencial creado: {adjustment_move.name}")
+            
+            # CORREGIDO: Usar account_type en lugar de internal_type para Odoo 17
+            adjustment_lines = adjustment_move.line_ids.filtered(
+                lambda l: l.account_id.account_type in ['asset_receivable', 'liability_payable']
+            )
+            
+            if len(adjustment_lines) >= 2:
+                # CORREGIDO: Reconciliar directamente las líneas originales con las líneas del asiento de ajuste
+                # Reconciliar pago con línea de ajuste (misma cuenta)
+                payment_adjustment_line = adjustment_lines.filtered(
+                    lambda l: l.account_id.id == payment_line.account_id.id
+                )
+                if payment_adjustment_line:
+                    # CORREGIDO: Usar reconciliación directa en lugar de partial_reconcile
+                    (payment_line + payment_adjustment_line).reconcile()
+                    _logger.info(f"✓ Pago reconciliado con línea de ajuste")
+                
+                # Reconciliar factura con línea de ajuste (misma cuenta)
+                invoice_adjustment_line = adjustment_lines.filtered(
+                    lambda l: l.account_id.id == invoice_line.account_id.id
+                )
+                if invoice_adjustment_line:
+                    # CORREGIDO: Usar reconciliación directa en lugar de partial_reconcile
+                    (invoice_line + invoice_adjustment_line).reconcile()
+                    _logger.info(f"✓ Factura reconciliada con línea de ajuste")
+                
+                return {
+                    'success': True, 
+                    'adjustment_move': adjustment_move,
+                    'message': f'Asiento de ajuste creado: {adjustment_move.name}'
+                }
+            else:
+                return {'success': False, 'message': 'No se pudieron crear las líneas de ajuste correctamente'}
+                
+        except Exception as e:
+            _logger.error(f"Error creando asiento de ajuste secuencial: {str(e)}")
+            return {'success': False, 'message': str(e)}
+
+    def button_reconciliate_payments_proportional(self):
+        # Implementa la lógica para la reconciliación proporcional aquí
+        pass
+
+    def button_reconciliate_payments_partial(self):
+        """
+        MÉTODO DE PAGOS PARCIALES: Implementa reconciliación parcial basada en sr_partial_invoice_payment
+        
+        Este método:
+        1. Marca los pagos como parciales (sr_is_partial = True)
+        2. Crea líneas adicionales en el asiento del pago para cada monto parcial
+        3. Usa partial_matching_number para agrupar líneas relacionadas
+        4. Reconcilia usando el sistema de números de coincidencia
+        """
+        try:
+            _logger.info(f"=== INICIANDO RECONCILIACIÓN PARCIAL PARA AGRUPADOR {self.name} ===")
+            
+            # Validar que el agrupador esté en estado publicado
+            if self.state != 'published':
+                raise UserError(_("El agrupador debe estar publicado para reconciliar pagos"))
+            
+            # Obtener todos los pagos confirmados del agrupador
+            payments = self.env["account.payment"].search([
+                ("payment_aggregator_id", "=", self.id),
+                ("state", "=", "posted")
+            ])
+            
+            if not payments:
+                raise UserError(_("No se encontraron pagos confirmados para reconciliar"))
+            
+            # Obtener facturas con monto asignado
+            invoices_to_reconcile = self.account_move_line_payment_agg_ids.filtered(
+                lambda line: line.payment_aggregator_total_import > 0
+            )
+            
+            if not invoices_to_reconcile:
+                raise UserError(_("No hay facturas con montos asignados para reconciliar"))
+            
+            _logger.info(f"Pagos encontrados: {len(payments)}")
+            _logger.info(f"Facturas a reconciliar: {len(invoices_to_reconcile)}")
+            
+            # Procesar cada pago secuencialmente
+            reconciliation_results = []
+            
+            for payment in payments:
+                _logger.info(f"=== PROCESANDO PAGO {payment.name} - Monto: {payment.amount} - Moneda: {payment.currency_id.name} ===")
+                
+                # Marcar el pago como parcial
+                payment.write({'sr_is_partial': True})
+                
+                # Obtener facturas restantes para este pago
+                remaining_invoices = self.account_move_line_payment_agg_ids.filtered(
+                    lambda line: line.payment_aggregator_total_import > 0
+                )
+                
+                _logger.info(f"Facturas restantes para pago {payment.name}: {len(remaining_invoices)}")
+                
+                # Distribuir este pago entre las facturas restantes
+                result = self._distribute_payment_partial_sr(
+                    payment, 
+                    remaining_invoices
+                )
+                reconciliation_results.append(result)
+            
+            # Resumen de resultados
+            successful_reconciliations = [r for r in reconciliation_results if r['success']]
+            failed_reconciliations = [r for r in reconciliation_results if not r['success']]
+            
+            _logger.info(f"=== RESUMEN DE RECONCILIACIÓN PARCIAL ===")
+            _logger.info(f"Pagos procesados exitosamente: {len(successful_reconciliations)}")
+            _logger.info(f"Pagos con errores: {len(failed_reconciliations)}")
+            
+            if failed_reconciliations:
+                failed_payments = [r['payment_name'] for r in failed_reconciliations]
+                _logger.warning(f"Pagos con errores: {failed_payments}")
+            
+            # Actualizar estados de facturas
+            self._update_invoice_payment_states()
+            
+            _logger.info(f"=== RECONCILIACIÓN PARCIAL COMPLETADA PARA AGRUPADOR {self.name} ===")
+            
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': _('Reconciliación Parcial Completada'),
+                    'message': _(f'Se procesaron {len(successful_reconciliations)} pagos exitosamente. '
+                               f'{len(failed_reconciliations)} pagos con errores.'),
+                    'type': 'success' if not failed_reconciliations else 'warning',
+                    'sticky': True,
+                }
+            }
+            
+        except Exception as e:
+            _logger.error(f"Error en reconciliación parcial: {str(e)}")
+            raise UserError(f"Error durante la reconciliación parcial: {str(e)}")
+
+    def _distribute_payment_partial_sr(self, payment, remaining_invoices):
+        """
+        Distribuye un pago parcialmente entre las facturas restantes usando la lógica de sr_partial_invoice_payment
+        
+        Args:
+            payment: Pago a distribuir
+            remaining_invoices: Facturas restantes por reconciliar
+            
+        Returns:
+            dict: Resultado de la distribución
+        """
+        try:
+            _logger.info(f"Distribuyendo pago {payment.name} parcialmente usando lógica SR")
+            
+            # Obtener líneas de pago originales
+            original_payment_lines = payment.line_ids.filtered(
+                lambda line: line.account_id.account_type in ['asset_receivable', 'liability_payable']
+                and not line.partial_matching_number
+            )
+            
+            if not original_payment_lines:
+                _logger.warning(f"No se encontraron líneas de pago originales para {payment.name}")
+                return {
+                    'success': False,
+                    'payment_name': payment.name,
+                    'error': 'No hay líneas de pago originales'
+                }
+            
+            original_payment_line = original_payment_lines[0]
+            _logger.info(f"Línea de pago original: {original_payment_line.id} - Saldo: {original_payment_line.amount_residual}")
+            
+            # Distribuir el pago secuencialmente entre las facturas restantes
+            reconciled_amount = 0
+            remaining_payment_amount = payment.amount
+            invoices_processed = []
+            
+            for invoice_line in remaining_invoices:
+                if remaining_payment_amount <= 0.01:
+                    _logger.info(f"Pago {payment.name} agotado, no se puede reconciliar más facturas")
+                    break
+                
+                assigned_amount = invoice_line.payment_aggregator_total_import
+                if assigned_amount <= 0:
+                    _logger.info(f"Factura {invoice_line.move_id.name} ya está completamente reconciliada, saltando")
+                    continue
+                
+                # Monto a reconciliar: el menor entre el monto restante del pago y el monto asignado a la factura
+                amount_to_reconcile = min(remaining_payment_amount, assigned_amount)
+                
+                if amount_to_reconcile > 0.01:
+                    _logger.info(f"Reconciliando {amount_to_reconcile} del pago {payment.name} con factura {invoice_line.move_id.name}")
+                    
+                    success = self._reconcile_payment_partial_sr(
+                        payment, 
+                        invoice_line.move_id, 
+                        amount_to_reconcile,
+                        original_payment_line
+                    )
+                    
+                    if success:
+                        reconciled_amount += amount_to_reconcile
+                        remaining_payment_amount -= amount_to_reconcile
+                        
+                        # Actualizar el monto asignado a la factura
+                        invoice_line.write({
+                            'payment_aggregator_total_import': assigned_amount - amount_to_reconcile
+                        })
+                        
+                        invoices_processed.append({
+                            'invoice_name': invoice_line.move_id.name,
+                            'amount_reconciled': amount_to_reconcile,
+                            'remaining_assigned': assigned_amount - amount_to_reconcile
+                        })
+                        
+                        _logger.info(f"✓ Reconciliado {amount_to_reconcile} del pago {payment.name} con factura {invoice_line.move_id.name}")
+                        _logger.info(f"  - Monto restante del pago: {remaining_payment_amount}")
+                        _logger.info(f"  - Monto restante asignado a la factura: {assigned_amount - amount_to_reconcile}")
+                    else:
+                        _logger.warning(f"✗ Falló reconciliación de {amount_to_reconcile} del pago {payment.name} con factura {invoice_line.move_id.name}")
+            
+            # Verificar si se reconcilió completamente
+            if remaining_payment_amount > 0.01:
+                _logger.warning(f"Pago {payment.name}: Falta reconciliar {remaining_payment_amount}")
+            
+            return {
+                'success': True,
+                'payment_name': payment.name,
+                'total_amount': payment.amount,
+                'reconciled_amount': reconciled_amount,
+                'remaining_amount': remaining_payment_amount,
+                'invoices_processed': invoices_processed
+            }
+            
+        except Exception as e:
+            _logger.error(f"Error distribuyendo pago {payment.name} parcialmente: {str(e)}")
+            return {
+                'success': False,
+                'payment_name': payment.name,
+                'error': str(e)
+            }
+
+    def _reconcile_payment_partial_sr(self, payment, invoice_move, amount_to_reconcile, original_payment_line):
+        """
+        Reconcilia un pago parcialmente con una factura usando EXACTAMENTE la lógica de sr_partial_invoice_payment
+        
+        Args:
+            payment: Pago a reconciliar
+            invoice_move: Factura a reconciliar
+            amount_to_reconcile: Monto a reconciliar
+            original_payment_line: Línea de pago original
+            
+        Returns:
+            bool: True si la reconciliación fue exitosa
+        """
+        try:
+            # Obtener líneas de factura pendientes de reconciliación
+            invoice_lines = invoice_move.line_ids.filtered(
+                lambda line: line.account_id.account_type in ['asset_receivable', 'liability_payable']
+                and not line.reconciled
+                and abs(line.amount_residual) > 0
+            )
+            
+            if not invoice_lines:
+                _logger.warning(f"No se encontraron líneas de factura pendientes para {invoice_move.name}")
+                return False
+            
+            invoice_line = invoice_lines[0]
+            
+            # IMPLEMENTACIÓN EXACTA DE sr_partial_invoice_payment
+            vals_list = []
+            
+            # 1. Crear nueva línea de débito en el asiento del pago (igual que SR)
+            vals_list.append((0, 0, {
+                "account_id": invoice_line.account_id.id,
+                "partner_id": invoice_line.partner_id.id,
+                "name": invoice_line.name,
+                "amount_currency": -amount_to_reconcile,
+                "currency_id": invoice_line.currency_id.id if invoice_line.currency_id else payment.currency_id.id,
+                "debit": 0.0,
+                "credit": amount_to_reconcile,
+                "tax_ids": [(6, 0, invoice_line.tax_ids.ids)],
+                "date_maturity": invoice_line.date_maturity,
+            }))
+            
+            # 2. Reducir la línea original del pago (igual que SR)
+            vals_list.append((1, original_payment_line.id, {
+                "debit": 0.0,
+                "credit": original_payment_line.credit - amount_to_reconcile,
+                "amount_currency": -(original_payment_line.credit - amount_to_reconcile),
+            }))
+            
+            # 3. Aplicar cambios al asiento del pago (igual que SR)
+            payment.move_id.write({"line_ids": vals_list})
+            
+            # 4. Generar número de coincidencia parcial (usando nuestra secuencia)
+            partial_sequence = self.env["ir.sequence"].next_by_code("partial.matching.sequence") or ""
+            
+            # 5. Obtener la nueva línea creada (igual que SR)
+            lines = payment.move_id.line_ids.filtered(
+                lambda l: l.credit == amount_to_reconcile
+                and l.move_id.id == payment.move_id.id
+            )
+            
+            # 6. Asignar partial_matching_number a la nueva línea (igual que SR)
+            if lines and not lines[-1].partial_matching_number:
+                lines[-1].write({"partial_matching_number": partial_sequence})
+            
+            # 7. Buscar línea de factura correspondiente (igual que SR)
+            if lines:
+                move_line = invoice_move.line_ids.filtered(
+                    lambda l: l.credit != amount_to_reconcile
+                    and l.account_id.id == lines[-1].account_id.id
+                    and l.move_id.id == invoice_move.id
+                )
+                
+                # 8. Asignar partial_matching_number a la línea de factura (igual que SR)
+                if move_line and not move_line.partial_matching_number:
+                    move_line.write({"partial_matching_number": partial_sequence})
+                elif move_line and move_line.partial_matching_number:
+                    move_line.write({
+                        "partial_matching_number": "%s,%s" % (move_line.partial_matching_number, partial_sequence)
+                    })
+                
+                # 9. Reconciliar las líneas con el mismo partial_matching_number (igual que SR)
+                lines += move_line
+                result = lines.reconcile()
+                
+                _logger.info(f"✓ Reconciliación parcial SR exitosa con número de coincidencia: {partial_sequence}")
+                return True
+            
+            return False
+            
+        except Exception as e:
+            _logger.error(f"Error en reconciliación parcial SR de pago con factura: {str(e)}")
+            return False
+
+    def button_reconciliate_payments_sr_style(self):
+        """
+        MÉTODO SR STYLE: Implementa reconciliación parcial usando EXACTAMENTE la lógica de sr_partial_invoice_payment
+        
+        Este método:
+        1. Marca los pagos como parciales (sr_is_partial = True)
+        2. Crea líneas adicionales en el asiento del pago para cada monto parcial
+        3. Usa partial_matching_number para agrupar líneas relacionadas
+        4. Reconcilia usando el sistema de números de coincidencia
+        """
+        try:
+            _logger.info(f"=== INICIANDO RECONCILIACIÓN SR STYLE PARA AGRUPADOR {self.name} ===")
+            
+            # Validar que el agrupador esté en estado publicado
+            if self.state != 'published':
+                raise UserError(_("El agrupador debe estar publicado para reconciliar pagos"))
+            
+            # Obtener todos los pagos confirmados del agrupador
+            payments = self.env["account.payment"].search([
+                ("payment_aggregator_id", "=", self.id),
+                ("state", "=", "posted")
+            ])
+            
+            if not payments:
+                raise UserError(_("No se encontraron pagos confirmados para reconciliar"))
+            
+            # Obtener facturas con monto asignado
+            invoices_to_reconcile = self.account_move_line_payment_agg_ids.filtered(
+                lambda line: line.payment_aggregator_total_import > 0
+            )
+            
+            if not invoices_to_reconcile:
+                raise UserError(_("No hay facturas con montos asignados para reconciliar"))
+            
+            _logger.info(f"Pagos encontrados: {len(payments)}")
+            _logger.info(f"Facturas a reconciliar: {len(invoices_to_reconcile)}")
+            
+            # Procesar cada pago secuencialmente usando la lógica SR
+            reconciliation_results = []
+            
+            for payment in payments:
+                _logger.info(f"=== PROCESANDO PAGO {payment.name} - Monto: {payment.amount} - Moneda: {payment.currency_id.name} ===")
+                
+                # Marcar el pago como parcial (igual que SR)
+                payment.write({'sr_is_partial': True})
+                
+                # Obtener facturas restantes para este pago
+                remaining_invoices = self.account_move_line_payment_agg_ids.filtered(
+                    lambda line: line.payment_aggregator_total_import > 0
+                )
+                
+                _logger.info(f"Facturas restantes para pago {payment.name}: {len(remaining_invoices)}")
+                
+                # Distribuir este pago entre las facturas restantes usando lógica SR
+                result = self._distribute_payment_sr_style(
+                    payment, 
+                    remaining_invoices
+                )
+                reconciliation_results.append(result)
+            
+            # Resumen de resultados
+            successful_reconciliations = [r for r in reconciliation_results if r['success']]
+            failed_reconciliations = [r for r in reconciliation_results if not r['success']]
+            
+            _logger.info(f"=== RESUMEN DE RECONCILIACIÓN SR STYLE ===")
+            _logger.info(f"Pagos procesados exitosamente: {len(successful_reconciliations)}")
+            _logger.info(f"Pagos con errores: {len(failed_reconciliations)}")
+            
+            if failed_reconciliations:
+                failed_payments = [r['payment_name'] for r in failed_reconciliations]
+                _logger.warning(f"Pagos con errores: {failed_payments}")
+            
+            # Actualizar estados de facturas
+            self._update_invoice_payment_states()
+            
+            _logger.info(f"=== RECONCILIACIÓN SR STYLE COMPLETADA PARA AGRUPADOR {self.name} ===")
+            
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': _('Reconciliación SR Style Completada'),
+                    'message': _(f'Se procesaron {len(successful_reconciliations)} pagos exitosamente. '
+                               f'{len(failed_reconciliations)} pagos con errores.'),
+                    'type': 'success' if not failed_reconciliations else 'warning',
+                    'sticky': True,
+                }
+            }
+            
+        except Exception as e:
+            _logger.error(f"Error en reconciliación SR style: {str(e)}")
+            raise UserError(f"Error durante la reconciliación SR style: {str(e)}")
+
+    def _distribute_payment_sr_style(self, payment, remaining_invoices):
+        """
+        Distribuye un pago entre las facturas restantes usando EXACTAMENTE la lógica de sr_partial_invoice_payment
+        
+        Args:
+            payment: Pago a distribuir
+            remaining_invoices: Facturas restantes por reconciliar
+            
+        Returns:
+            dict: Resultado de la distribución
+        """
+        try:
+            _logger.info(f"Distribuyendo pago {payment.name} usando lógica SR")
+            
+            # Obtener línea de pago original (igual que SR)
+            original_payment_line = payment.line_ids.filtered(
+                lambda line: line.account_id.account_type in ['asset_receivable', 'liability_payable']
+                and not line.partial_matching_number
+            )
+            
+            if not original_payment_line:
+                _logger.warning(f"No se encontró línea de pago original para {payment.name}")
+                return {
+                    'success': False,
+                    'payment_name': payment.name,
+                    'error': 'No hay línea de pago original'
+                }
+            
+            original_payment_line = original_payment_line[0]
+            _logger.info(f"Línea de pago original: {original_payment_line.id} - Saldo: {original_payment_line.amount_residual}")
+            
+            # Distribuir el pago secuencialmente entre las facturas restantes
+            reconciled_amount = 0
+            remaining_payment_amount = payment.amount
+            invoices_processed = []
+            
+            for invoice_line in remaining_invoices:
+                if remaining_payment_amount <= 0.01:
+                    _logger.info(f"Pago {payment.name} agotado, no se puede reconciliar más facturas")
+                    break
+                
+                assigned_amount = invoice_line.payment_aggregator_total_import
+                if assigned_amount <= 0:
+                    _logger.info(f"Factura {invoice_line.move_id.name} ya está completamente reconciliada, saltando")
+                    continue
+                
+                # Monto a reconciliar: el menor entre el monto restante del pago y el monto asignado a la factura
+                amount_to_reconcile = min(remaining_payment_amount, assigned_amount)
+                
+                if amount_to_reconcile > 0.01:
+                    _logger.info(f"Reconciliando {amount_to_reconcile} del pago {payment.name} con factura {invoice_line.move_id.name}")
+                    
+                    success = self._reconcile_payment_sr_style(
+                        payment, 
+                        invoice_line.move_id, 
+                        amount_to_reconcile,
+                        original_payment_line
+                    )
+                    
+                    if success:
+                        reconciled_amount += amount_to_reconcile
+                        remaining_payment_amount -= amount_to_reconcile
+                        
+                        # Actualizar el monto asignado a la factura
+                        invoice_line.write({
+                            'payment_aggregator_total_import': assigned_amount - amount_to_reconcile
+                        })
+                        
+                        invoices_processed.append({
+                            'invoice_name': invoice_line.move_id.name,
+                            'amount_reconciled': amount_to_reconcile,
+                            'remaining_assigned': assigned_amount - amount_to_reconcile
+                        })
+                        
+                        _logger.info(f"✓ Reconciliado {amount_to_reconcile} del pago {payment.name} con factura {invoice_line.move_id.name}")
+                        _logger.info(f"  - Monto restante del pago: {remaining_payment_amount}")
+                        _logger.info(f"  - Monto restante asignado a la factura: {assigned_amount - amount_to_reconcile}")
+                    else:
+                        _logger.warning(f"✗ Falló reconciliación de {amount_to_reconcile} del pago {payment.name} con factura {invoice_line.move_id.name}")
+            
+            # Verificar si se reconcilió completamente
+            if remaining_payment_amount > 0.01:
+                _logger.warning(f"Pago {payment.name}: Falta reconciliar {remaining_payment_amount}")
+            
+            return {
+                'success': True,
+                'payment_name': payment.name,
+                'total_amount': payment.amount,
+                'reconciled_amount': reconciled_amount,
+                'remaining_amount': remaining_payment_amount,
+                'invoices_processed': invoices_processed
+            }
+            
+        except Exception as e:
+            _logger.error(f"Error distribuyendo pago {payment.name} con lógica SR: {str(e)}")
+            return {
+                'success': False,
+                'payment_name': payment.name,
+                'error': str(e)
+            }
+
+    def _reconcile_payment_sr_style(self, payment, invoice_move, amount_to_reconcile, original_payment_line):
+        """
+        Reconcilia un pago parcialmente con una factura usando EXACTAMENTE la lógica de sr_partial_invoice_payment
+        
+        Args:
+            payment: Pago a reconciliar
+            invoice_move: Factura a reconciliar
+            amount_to_reconcile: Monto a reconciliar
+            original_payment_line: Línea de pago original
+            
+        Returns:
+            bool: True si la reconciliación fue exitosa
+        """
+        try:
+            # Obtener líneas de factura pendientes de reconciliación
+            invoice_lines = invoice_move.line_ids.filtered(
+                lambda line: line.account_id.account_type in ['asset_receivable', 'liability_payable']
+                and not line.reconciled
+                and abs(line.amount_residual) > 0
+            )
+            
+            if not invoice_lines:
+                _logger.warning(f"No se encontraron líneas de factura pendientes para {invoice_move.name}")
+                return False
+            
+            invoice_line = invoice_lines[0]
+            
+            # IMPLEMENTACIÓN EXACTA DE sr_partial_invoice_payment
+            vals_list = []
+            
+            # 1. Crear nueva línea de débito en el asiento del pago (igual que SR)
+            vals_list.append((0, 0, {
+                "account_id": invoice_line.account_id.id,
+                "partner_id": invoice_line.partner_id.id,
+                "name": invoice_line.name,
+                "amount_currency": -amount_to_reconcile,
+                "currency_id": invoice_line.currency_id.id if invoice_line.currency_id else payment.currency_id.id,
+                "debit": 0.0,
+                "credit": amount_to_reconcile,
+                "tax_ids": [(6, 0, invoice_line.tax_ids.ids)],
+                "date_maturity": invoice_line.date_maturity,
+            }))
+            
+            # 2. Reducir la línea original del pago (igual que SR)
+            vals_list.append((1, original_payment_line.id, {
+                "debit": 0.0,
+                "credit": original_payment_line.credit - amount_to_reconcile,
+                "amount_currency": -(original_payment_line.credit - amount_to_reconcile),
+            }))
+            
+            # 3. Aplicar cambios al asiento del pago (igual que SR)
+            payment.move_id.write({"line_ids": vals_list})
+            
+            # 4. Generar número de coincidencia parcial (usando nuestra secuencia)
+            partial_sequence = self.env["ir.sequence"].next_by_code("partial.matching.sequence") or ""
+            
+            # 5. Obtener la nueva línea creada (igual que SR)
+            lines = payment.move_id.line_ids.filtered(
+                lambda l: l.credit == amount_to_reconcile
+                and l.move_id.id == payment.move_id.id
+            )
+            
+            # 6. Asignar partial_matching_number a la nueva línea (igual que SR)
+            if lines and not lines[-1].partial_matching_number:
+                lines[-1].write({"partial_matching_number": partial_sequence})
+            
+            # 7. Buscar línea de factura correspondiente (igual que SR)
+            if lines:
+                move_line = invoice_move.line_ids.filtered(
+                    lambda l: l.credit != amount_to_reconcile
+                    and l.account_id.id == lines[-1].account_id.id
+                    and l.move_id.id == invoice_move.id
+                )
+                
+                # 8. Asignar partial_matching_number a la línea de factura (igual que SR)
+                if move_line and not move_line.partial_matching_number:
+                    move_line.write({"partial_matching_number": partial_sequence})
+                elif move_line and move_line.partial_matching_number:
+                    move_line.write({
+                        "partial_matching_number": "%s,%s" % (move_line.partial_matching_number, partial_sequence)
+                    })
+                
+                # 9. Reconciliar las líneas con el mismo partial_matching_number (igual que SR)
+                lines += move_line
+                result = lines.reconcile()
+                
+                _logger.info(f"✓ Reconciliación parcial SR exitosa con número de coincidencia: {partial_sequence}")
+                return True
+            
+            return False
+            
+        except Exception as e:
+            _logger.error(f"Error en reconciliación parcial SR de pago con factura: {str(e)}")
+            return False
+
+    def button_reconciliate_payments_simple(self):
+        """
+        MÉTODO SIMPLIFICADO: Reconcilia pagos con facturas usando asientos de ajuste
+        
+        Este método:
+        1. Toma cada pago secuencialmente
+        2. Para cada factura con monto asignado, crea un asiento de ajuste
+        3. Reconcilia usando el asiento de ajuste como puente
+        """
+        try:
+            _logger.info(f"=== INICIANDO RECONCILIACIÓN SIMPLE PARA AGRUPADOR {self.name} ===")
+            
+            # Validar que el agrupador esté en estado publicado
+            if self.state != 'published':
+                raise UserError("El agrupador debe estar en estado 'Publicado' para reconciliar pagos")
+            
+            # Obtener pagos del agrupador usando búsqueda
+            payments = self.env["account.payment"].search([
+                ("payment_aggregator_id", "=", self.id),
+                ("state", "=", "posted")
+            ])
+            if not payments:
+                raise UserError("No hay pagos confirmados para reconciliar")
+            
+            _logger.info(f"Pagos encontrados: {len(payments)}")
+            
+            # Obtener facturas con montos asignados
+            invoice_lines = self.account_move_line_payment_agg_ids.filtered(
+                lambda l: l.payment_aggregator_total_import > 0
+            )
+            if not invoice_lines:
+                raise UserError("No hay facturas con montos asignados para reconciliar")
+            
+            _logger.info(f"Facturas a reconciliar: {len(invoice_lines)}")
+            
+            # Procesar cada pago secuencialmente
+            for payment in payments:
+                _logger.info(f"=== PROCESANDO PAGO {payment.name} - Monto: {payment.amount} - Moneda: {payment.currency_id.name} ===")
+                
+                # Obtener facturas restantes para este pago
+                remaining_invoices = invoice_lines.filtered(
+                    lambda l: l.payment_aggregator_total_import > 0
+                )
+                
+                if not remaining_invoices:
+                    _logger.info(f"No hay facturas restantes para el pago {payment.name}")
+                    continue
+                
+                _logger.info(f"Facturas restantes para pago {payment.name}: {len(remaining_invoices)}")
+                
+                # Distribuir el pago entre las facturas
+                self._distribute_payment_simple(payment, remaining_invoices)
+            
+            # Actualizar estados de facturas
+            self._update_invoice_states()
+            
+            _logger.info(f"=== RECONCILIACIÓN SIMPLE COMPLETADA PARA AGRUPADOR {self.name} ===")
+            
+        except Exception as e:
+            _logger.error(f"Error en reconciliación simple: {e}")
+            raise UserError(f"Error durante la reconciliación simple: {e}")
+    
+    def _distribute_payment_simple(self, payment, remaining_invoices):
+        """
+        Distribuye un pago entre las facturas restantes usando asientos de ajuste
+        
+        Args:
+            payment: Pago a distribuir
+            remaining_invoices: Facturas restantes por reconciliar
+        """
+        try:
+            _logger.info(f"Distribuyendo pago {payment.name} usando asientos de ajuste")
+            
+            # Obtener líneas de pago con saldo residual
+            payment_lines = payment.move_id.line_ids.filtered(
+                lambda l: l.account_id.account_type in ['asset_receivable', 'liability_payable']
+                and abs(l.amount_residual) > 0
+            )
+            
+            if not payment_lines:
+                _logger.warning(f"No hay líneas de pago con saldo residual para {payment.name}")
+                return
+            
+            _logger.info(f"Líneas de pago pendientes: {len(payment_lines)}")
+            
+            # Procesar cada factura secuencialmente
+            for invoice_line in remaining_invoices:
+                if payment_lines[0].amount_residual == 0:
+                    _logger.info(f"Pago {payment.name} agotado")
+                    break
+                
+                amount_to_reconcile = min(
+                    abs(payment_lines[0].amount_residual),
+                    invoice_line.payment_aggregator_total_import
+                )
+                
+                if amount_to_reconcile <= 0:
+                    continue
+                
+                _logger.info(f"Reconciliando {amount_to_reconcile} del pago {payment.name} con factura {invoice_line.move_id.name}")
+                
+                # Crear asiento de ajuste y reconciliar
+                success = self._create_adjustment_and_reconcile_simple(
+                    payment, 
+                    invoice_line.move_id,  # Usar move_id en lugar de invoice_id
+                    amount_to_reconcile
+                )
+                
+                if success:
+                    # Actualizar el monto asignado a la factura
+                    invoice_line.payment_aggregator_total_import -= amount_to_reconcile
+                    _logger.info(f"✓ Reconciliado {amount_to_reconcile} del pago {payment.name} con factura {invoice_line.move_id.name}")
+                else:
+                    _logger.warning(f"✗ Falló reconciliación de {amount_to_reconcile} del pago {payment.name} con factura {invoice_line.move_id.name}")
+            
+            # Verificar si quedó saldo sin reconciliar
+            remaining_amount = abs(payment_lines[0].amount_residual)
+            if remaining_amount > 0:
+                _logger.warning(f"Pago {payment.name}: Falta reconciliar {remaining_amount}")
+            
+        except Exception as e:
+            _logger.error(f"Error distribuyendo pago {payment.name}: {e}")
+            raise
+    
+    def _create_adjustment_and_reconcile_simple(self, payment, invoice_move, amount_to_reconcile):
+        """
+        Crea un asiento de ajuste y reconcilia entre el pago y la factura
+        
+        Args:
+            payment: Pago a reconciliar
+            invoice_move: Factura a reconciliar
+            amount_to_reconcile: Monto a reconciliar
+            
+        Returns:
+            bool: True si la reconciliación fue exitosa
+        """
+        try:
+            _logger.info(f"Creando asiento de ajuste para reconciliar {amount_to_reconcile}")
+            
+            # Obtener líneas de pago y factura
+            payment_lines = payment.move_id.line_ids.filtered(
+                lambda l: l.account_id.account_type in ['asset_receivable', 'liability_payable']
+                and abs(l.amount_residual) > 0
+            )
+            
+            invoice_lines = invoice_move.line_ids.filtered(
+                lambda l: l.account_id.account_type in ['asset_receivable', 'liability_payable']
+                and abs(l.amount_residual) > 0
+            )
+            
+            if not payment_lines or not invoice_lines:
+                _logger.warning("No se encontraron líneas válidas para reconciliar")
+                return False
+            
+            # Crear asiento de ajuste
+            adjustment_move = self._create_simple_adjustment_entry(
+                payment, invoice_move, amount_to_reconcile
+            )
+            
+            if not adjustment_move:
+                return False
+            
+            # Reconcilia las líneas usando el asiento de ajuste
+            return self._reconcile_with_adjustment_simple(
+                payment_lines[0], invoice_lines[0], adjustment_move, amount_to_reconcile
+            )
+            
+        except Exception as e:
+            _logger.error(f"Error creando asiento de ajuste: {e}")
+            return False
+    
+    def _create_simple_adjustment_entry(self, payment, invoice_move, amount_to_reconcile):
+        """
+        Crea un asiento de ajuste simple para reconciliar entre cuentas diferentes
+        
+        Args:
+            payment: Pago a reconciliar
+            invoice_move: Factura a reconciliar
+            amount_to_reconcile: Monto a reconciliar
+            
+        Returns:
+            account.move: Asiento de ajuste creado
+        """
+        try:
+            # Obtener cuentas
+            payment_account = payment.move_id.line_ids.filtered(
+                lambda l: l.account_id.account_type in ['asset_receivable', 'liability_payable']
+            )[0].account_id
+            
+            invoice_account = invoice_move.line_ids.filtered(
+                lambda l: l.account_id.account_type in ['asset_receivable', 'liability_payable']
+            )[0].account_id
+            
+            # Crear asiento de ajuste
+            adjustment_vals = {
+                'move_type': 'entry',
+                'date': payment.date,
+                'ref': f'Ajuste para reconciliación {payment.name} - {invoice_move.name}',
+                'line_ids': [
+                    # Línea de débito (cuenta de pago)
+                    (0, 0, {
+                        'account_id': payment_account.id,
+                        'debit': amount_to_reconcile,
+                        'credit': 0,
+                        'currency_id': payment.currency_id.id,
+                        'amount_currency': amount_to_reconcile,
+                    }),
+                    # Línea de crédito (cuenta de factura)
+                    (0, 0, {
+                        'account_id': invoice_account.id,
+                        'debit': 0,
+                        'credit': amount_to_reconcile,
+                        'currency_id': payment.currency_id.id,
+                        'amount_currency': -amount_to_reconcile,
+                    }),
+                ]
+            }
+            
+            adjustment_move = self.env['account.move'].create(adjustment_vals)
+            adjustment_move.action_post()
+            
+            _logger.info(f"Asiento de ajuste creado: {adjustment_move.name}")
+            return adjustment_move
+            
+        except Exception as e:
+            _logger.error(f"Error creando asiento de ajuste: {e}")
+            return None
+    
+    def _reconcile_with_adjustment_simple(self, payment_line, invoice_line, adjustment_move, amount):
+        """
+        Reconcilia las líneas usando el asiento de ajuste como puente
+        
+        Args:
+            payment_line: Línea del pago
+            invoice_line: Línea de la factura
+            adjustment_move: Asiento de ajuste
+            amount: Monto a reconciliar
+            
+        Returns:
+            bool: True si la reconciliación fue exitosa
+        """
+        try:
+            # Obtener líneas del asiento de ajuste
+            adjustment_lines = adjustment_move.line_ids
+            
+            # Reconcilia pago con línea de débito del ajuste
+            payment_adjustment_lines = adjustment_lines.filtered(
+                lambda l: l.account_id == payment_line.account_id
+            )
+            
+            if payment_adjustment_lines:
+                (payment_line | payment_adjustment_lines[0]).reconcile()
+                _logger.info("Reconciliación pago-ajuste exitosa")
+            
+            # Reconcilia factura con línea de crédito del ajuste
+            invoice_adjustment_lines = adjustment_lines.filtered(
+                lambda l: l.account_id == invoice_line.account_id
+            )
+            
+            if invoice_adjustment_lines:
+                (invoice_line | invoice_adjustment_lines[0]).reconcile()
+                _logger.info("Reconciliación factura-ajuste exitosa")
+            
+            return True
+            
+        except Exception as e:
+            _logger.error(f"Error en reconciliación con ajuste: {e}")
+            return False
+
+    def _update_invoice_states(self):
+        # Actualizar estados de facturas (usar método existente)
+        for invoice_line in self.account_move_line_payment_agg_ids:
+            if invoice_line.move_id:
+                invoice_line.move_id._compute_amount()
+                _logger.info(f"Estado de pago actualizado para factura {invoice_line.move_id.name}: {invoice_line.move_id.payment_state}")

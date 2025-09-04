@@ -45,6 +45,13 @@ class AccountPayment(models.Model):
         string='Check',
     )
     
+    # Campo para pagos parciales (compatible con sr_partial_invoice_payment)
+    sr_is_partial = fields.Boolean(
+        string="Sr Is Partial", 
+        default=False,
+        help="Marks this payment as partial for reconciliation purposes"
+    )
+    
     def _check_payment_method_line_id(self):
         return super()._check_payment_method_line_id()
 
