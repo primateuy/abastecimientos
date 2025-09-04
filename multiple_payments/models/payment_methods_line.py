@@ -68,25 +68,7 @@ class MPPaymentMethodsLine(models.Model):
         "Batch Deposit: Collect several customer checks at once generating and submitting a batch deposit to your bank. Module account_batch_payment is necessary.\n"
         "SEPA Credit Transfer: Pay in the SEPA zone by submitting a SEPA Credit Transfer file to your bank. Module account_sepa is necessary.\n"
         "SEPA Direct Debit: Get paid in the SEPA zone thanks to a mandate your partner will have granted to you. Module account_sepa is necessary.\n")
-
-    # MODIFICACIÓN 1: Campo exchange_rate como currency_rate de account_move
-    exchange_rate = fields.Float(
-        string='Exchange Rate',
-        digits=(16, 6),
-        compute='_compute_exchange_rate',
-        store=True,
-        help="Exchange rate between payment currency and aggregator currency"
-    )
-    
-    # NUEVO CAMPO: Importe en moneda del diario
-    payment_currency_amount = fields.Monetary(
-        string='Amount in Payment Currency',
-        currency_field='currency_id',
-        compute='_compute_payment_currency_amount',
-        store=True,
-        help="Amount converted to the payment method currency (diario currency)"
-    )
-    
+    exchange_rate = fields.Float(default=1)
     exchange_rate_visibility = fields.Boolean(
         default=False,
     )
@@ -135,104 +117,6 @@ class MPPaymentMethodsLine(models.Model):
         string='company',
         default=lambda self: self.env.company
         )
-
-    # MÉTODO NUEVO: Computar exchange_rate como currency_rate de account_move
-    @api.depends('currency_id', 'payment_aggregator_currency_id', 'date', 'payment_amount', 'amount')
-    def _compute_exchange_rate(self):
-        """
-        Computar la tasa de cambio de manera similar a currency_rate en account_move.
-        Se actualiza automáticamente cuando cambian las monedas, fecha, o importes.
-        """
-        for record in self:
-            if not record.currency_id or not record.payment_aggregator_currency_id:
-                record.exchange_rate = 1.0
-                continue
-                
-            # Si las monedas son iguales, la tasa es 1
-            if record.currency_id.id == record.payment_aggregator_currency_id.id:
-                record.exchange_rate = 1.0
-                continue
-            
-            # Si hay payment_amount y amount, calcular la tasa basada en ellos
-            if record.payment_amount and record.amount and record.payment_amount > 0:
-                record.exchange_rate = record.amount / record.payment_amount
-                continue
-            
-            # Si no hay importes, usar la tasa oficial de Odoo
-            try:
-                date = record.date or fields.Date.today()
-                company = record.env.company
-                
-                # Obtener la tasa de conversión oficial
-                converted_amount = record.currency_id._convert(
-                    1.0,
-                    record.payment_aggregator_currency_id,
-                    company,
-                    date
-                )
-                
-                record.exchange_rate = converted_amount if converted_amount > 0 else 1.0
-                
-            except Exception as e:
-                _logger.warning("Error computing exchange rate: %s", str(e))
-                record.exchange_rate = 1.0
-
-    # NUEVO MÉTODO: Computar importe en moneda del diario
-    @api.depends('payment_amount', 'amount', 'currency_id', 'payment_aggregator_currency_id')
-    def _compute_payment_currency_amount(self):
-        """
-        Computar el importe en la moneda del diario (moneda del método de pago).
-        Este campo muestra el valor convertido a la moneda del diario.
-        Fórmula: payment_amount / amount
-        """
-        for record in self:
-            if not record.payment_amount or not record.amount or record.amount <= 0:
-                record.payment_currency_amount = 0.0
-                continue
-            
-            # Si las monedas son iguales, el importe es el mismo
-            if record._checkSameCurrency():
-                record.payment_currency_amount = record.payment_amount
-                continue
-            
-            # Calcular el importe en la moneda del diario
-            # Fórmula: payment_amount / amount
-            # Donde payment_amount está en moneda del diario y amount en moneda del agrupador
-            record.payment_currency_amount = record.payment_amount / record.amount
-
-    # MODIFICACIÓN 2: Onchange para amount que recalcula exchange_rate
-    @api.onchange('amount')
-    def onchange_amount(self):
-        """
-        Recalcular exchange_rate cuando se modifica el campo amount.
-        Este método permite al usuario modificar directamente el amount y 
-        que se recalcule automáticamente la tasa de cambio.
-        """
-        if not self.amount or not self.payment_amount or self.payment_amount <= 0:
-            return
-            
-        # Calcular la nueva tasa de cambio basada en amount y payment_amount
-        new_exchange_rate = self.amount / self.payment_amount
-        
-        # Actualizar el exchange_rate directamente (sin trigger del compute)
-        self._origin.exchange_rate = new_exchange_rate
-
-    # MODIFICACIÓN 3: Onchange para exchange_rate que recalcula amount
-    @api.onchange('exchange_rate')
-    def onchange_exchange_rate(self):
-        """
-        Recalcular amount cuando se modifica el campo exchange_rate.
-        Este método permite al usuario modificar directamente la tasa de cambio
-        y que se recalcule automáticamente el amount.
-        """
-        if not self.exchange_rate or not self.payment_amount or self.exchange_rate <= 0:
-            return
-            
-        # Calcular el nuevo amount basado en payment_amount y exchange_rate
-        new_amount = self.payment_amount * self.exchange_rate
-        
-        # Actualizar el amount directamente
-        self.amount = new_amount
 
     # Metodo para asignar el dominio de los metodos de pago
     @api.onchange('account_journal_id')
@@ -305,13 +189,10 @@ class MPPaymentMethodsLine(models.Model):
             _logger.warning("Error calculating exchange rate: %s", str(e))
             self.exchange_rate = 1.0
 
-    # MODIFICACIÓN 4: Onchange mejorado para payment_amount
-    @api.onchange('payment_amount')
+    # MÉTODO CORREGIDO: Calcular importes con conversión de monedas
+    @api.onchange('payment_amount','exchange_rate','amount')
     def onchange_payment_amount(self):
-        """
-        Recalcular importes cuando cambia el monto del pago.
-        Este método actualiza tanto amount como exchange_rate cuando se modifica payment_amount.
-        """
+        """Recalcular importes cuando cambia el monto del pago o la tasa de cambio"""
         
         # Si no hay monto de pago, limpiar el importe
         if not self.payment_amount:
@@ -338,10 +219,6 @@ class MPPaymentMethodsLine(models.Model):
                     company,
                     date
                 )
-                
-                # Actualizar la tasa de cambio basada en la conversión real
-                if self.payment_amount > 0:
-                    self._origin.exchange_rate = self.amount / self.payment_amount
                 
             except Exception as e:
                 _logger.warning("Error in currency conversion: %s", str(e))
@@ -464,20 +341,13 @@ class MPPaymentMethodsLine(models.Model):
         for pay in self:
             available_payment_method_lines = pay.available_payment_method_line_ids
 
-            # CORREGIDO: Solo asignar valor por defecto si no hay selección previa
-            # Preservar la selección del usuario cuando sea válida
+            # Select the first available one by default.
             if pay.payment_method_line_id in available_payment_method_lines:
-                # Mantener la selección actual si es válida
                 pay.payment_method_line_id = pay.payment_method_line_id
-            elif not pay.payment_method_line_id and available_payment_method_lines:
-                # Solo asignar por defecto si no hay selección previa
+            elif available_payment_method_lines:
                 pay.payment_method_line_id = available_payment_method_lines[0]._origin
-            elif pay.payment_method_line_id and pay.payment_method_line_id not in available_payment_method_lines:
-                # Si la selección actual no es válida, limpiar el campo
-                pay.payment_method_line_id = False
             else:
-                # Mantener el estado actual
-                pass
+                pay.payment_method_line_id = False
 
     @api.depends('payment_type', 'account_journal_id', 'currency_id')
     def _compute_payment_method_line_fields(self):
