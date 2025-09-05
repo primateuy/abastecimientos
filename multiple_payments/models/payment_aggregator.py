@@ -1557,7 +1557,15 @@ class PaymentAggregator(models.Model):
 
             if reverse_payment:
                 _logger.info(f"Reconciliando pago contrario con métodos de pago del agrupador")
-                self._reconcile_reverse_payment_with_methods(reverse_payment)
+                # Buscar pagos existentes del agrupador (métodos de pago)
+                existing_payments = self.env['account.payment'].search([
+                    ('payment_aggregator_id', '=', self.id),
+                    ('state', '=', 'posted'),
+                    ('id', '!=', reverse_payment.id),  # Excluir el pago contrario
+                    ('ref', 'not ilike', 'Pago automático proveedor'),  # Excluir pagos de facturas
+                    ('ref', 'not ilike', 'Pago inverso proveedor'),  # Excluir otros pagos inversos
+                ])
+                self._reconcile_reverse_payment_with_methods(reverse_payment, existing_payments)
 
         _logger.info(f"=== RECONCILIACIÓN PROVEEDORES COMPLETADA - {len(created_payments)} pagos creados ===")
 
@@ -4950,61 +4958,3 @@ class PaymentAggregator(models.Model):
             _logger.error(f"Error creando pago contrario para proveedores: {e}")
             return None
 
-    def _reconcile_reverse_payment_with_methods(self, reverse_payment):
-        """
-        Reconcilia el pago contrario con los métodos de pago del agrupador
-        """
-        try:
-            _logger.info(f"Reconciliando pago contrario {reverse_payment.name} con métodos de pago del agrupador")
-
-            # Buscar pagos existentes del agrupador (métodos de pago)
-            existing_payments = self.env['account.payment'].search([
-                ('payment_aggregator_id', '=', self.id),
-                ('state', '=', 'posted'),
-                ('id', '!=', reverse_payment.id),  # Excluir el pago contrario
-                ('ref', 'not ilike', 'Pago automático proveedor'),  # Excluir pagos de facturas
-                ('ref', 'not ilike', 'Pago inverso proveedor'),  # Excluir otros pagos inversos
-            ])
-
-            _logger.info(f"Pagos de métodos encontrados para reconciliar: {len(existing_payments)}")
-
-            if not existing_payments:
-                _logger.warning("No se encontraron pagos de métodos para reconciliar")
-                return
-
-            # Obtener líneas del pago contrario
-            reverse_payment_lines = reverse_payment.move_id.line_ids.filtered(
-                lambda l: l.account_id.account_type in ['asset_receivable', 'liability_payable']
-            )
-
-            # Obtener líneas de los métodos de pago
-            existing_payment_lines = existing_payments.mapped('move_id.line_ids').filtered(
-                lambda l: l.account_id.account_type in ['asset_receivable', 'liability_payable']
-            )
-
-            _logger.info(f"Líneas del pago contrario: {len(reverse_payment_lines)}")
-            _logger.info(f"Líneas de métodos de pago: {len(existing_payment_lines)}")
-
-            if not existing_payment_lines:
-                _logger.warning("No hay líneas de métodos de pago para reconciliar")
-                return
-
-            # Combinar todas las líneas para reconciliación masiva
-            all_lines_to_reconcile = reverse_payment_lines | existing_payment_lines
-
-            _logger.info(f"Total de líneas a reconciliar juntas: {len(all_lines_to_reconcile)}")
-
-            if len(all_lines_to_reconcile) > 1:
-                try:
-                    # Reconciliar TODAS las líneas juntas en una sola operación
-                    all_lines_to_reconcile.reconcile()
-                    _logger.info(f"✓ Reconciliación masiva exitosa: {len(all_lines_to_reconcile)} líneas reconciliadas juntas")
-                except Exception as e:
-                    _logger.warning(f"No se pudo realizar reconciliación masiva: {e}")
-                    # Fallback: reconciliación por grupos
-                    self._reconcile_by_compatible_groups(reverse_payment_lines, existing_payment_lines)
-            else:
-                _logger.warning("No hay suficientes líneas para reconciliar")
-
-        except Exception as e:
-            _logger.error(f"Error reconciliando pago contrario con métodos: {e}")
