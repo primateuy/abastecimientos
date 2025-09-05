@@ -111,7 +111,7 @@
                             </page>
                             <page name="credits" string="Outstanding Credits/Debits">
                                 <button 
-                                    name="button_reconciliate_payments_simple"
+                                    name="button_reconciliate_payments_advanced"
                                     type="object"
                                     string="Concialite" 
                                     class="oe_highlight fa m-1" 
