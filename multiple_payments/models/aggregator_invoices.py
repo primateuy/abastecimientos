@@ -22,7 +22,7 @@ class PaymentAggregatorInvoices(models.Model):
                 'amount': 0.0,
                 'is_internal_transfer': False,
                 'payment_type': getattr(self.receiptbook_id, 'type', 'inbound') if getattr(self, 'receiptbook_id', False) else 'inbound',
-                'journal_id': getattr(self.currency_id, 'account_journal_id', False) and self.currency_id.account_journal_id.id or False,
+                'journal_id': getattr(self.receiptbook_id, 'account_journal_id', False) and self.receiptbook_id.account_journal_id.id or False,
                 'partner_type': getattr(self.receiptbook_id, 'partner_type', 'customer') if getattr(self, 'receiptbook_id', False) else 'customer',
                 'payment_aggregator_id': self.id,
             }
