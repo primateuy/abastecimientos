@@ -32,8 +32,8 @@ class PaymentAggregatorHelpers(models.Model):
         # journal origen obligatorio
         journal_id = kwargs.get('journal_id')
         if not journal_id:
-            # fallback: diario por moneda del agregador
-            journal_id = getattr(self.currency_id, 'account_journal_id', False) and self.currency_id.account_journal_id.id or False
+            # fallback: diario del talonario (correcto para clientes y proveedores)
+            journal_id = getattr(self.receiptbook_id, 'account_journal_id', False) and self.receiptbook_id.account_journal_id.id or False
         if not journal_id:
             raise UserError(_('No se encontró Diario para crear el pago.'))
 

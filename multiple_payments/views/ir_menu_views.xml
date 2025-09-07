@@ -11,14 +11,14 @@
         <menuitem
             id="general_payments_aggregator_menu"
             name="Customer or Supplier Receipt"
-            action="payments_aggregator_view_action"
+            action="multiple_payments.payments_aggregator_view_action"
             parent="payment_aggregator_parent_menu"
         />
         <!-- Agrupador de pagos de clientes -->
         <menuitem
             id="customers_payments_aggregator_menu"
             name="Payments aggregator"
-            action="payments_aggregator_customers_view_action"
+            action="multiple_payments.payments_aggregator_customers_view_action"
             parent="account.menu_finance_receivables"
             sequence="6"
         />
@@ -26,7 +26,7 @@
         <menuitem
             id="supplier_payments_aggregator_menu"
             name="Payments aggregator"
-            action="payments_aggregator_suppliers_view_action"
+            action="multiple_payments.payments_aggregator_suppliers_view_action"
             parent="account.menu_finance_payables"
             sequence="6"
         />
@@ -41,7 +41,7 @@
         <menuitem
             id="customer_receipt_books_menu"
             name="Receiptbooks"
-            action="mps_receipt_books_customer_views_action"
+            action="multiple_payments.mps_receipt_books_customer_views_action"
             parent="account.menu_finance_receivables"
             sequence="5"
         />
@@ -49,17 +49,17 @@
         <menuitem
             id="supplier_receipt_books_menu"
             name="Receiptbooks"
-            action="mps_receipt_books_supplier_views_action"
+            action="multiple_payments.mps_receipt_books_supplier_views_action"
             parent="account.menu_finance_payables"
             sequence="5"
         />
 
         <!-- Diarios intermedios -->
-        <!-- <menuitem
+        <menuitem
             id="account_intermediate_journal_menu"
             name="Intermediate diary"
-            action="account_journal_aggregator_view_action"
+            action="multiple_payments.account_journal_aggregator_view_action"
             parent="payment_aggregator_parent_menu"
-            sequence="1"/> -->
+            sequence="1"/>
     </data>
 </odoo>

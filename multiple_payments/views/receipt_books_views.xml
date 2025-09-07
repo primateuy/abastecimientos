@@ -13,6 +13,8 @@
                         <group>
                             <field name="partner_type"/>
                             <field name="type" widget="radio" options="{'horizontal': true}"/>
+                             <field name="journal_ids_domain" invisible="1"/>
+                            <field name="account_journal_id" string="Diario de Pago a Cuenta" domain="journal_ids_domain"/>
                             <field name="enable_reverse_payment" widget="boolean_toggle"/>
                         </group>
                         <group>

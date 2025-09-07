@@ -45,6 +45,13 @@ class AccountPayment(models.Model):
         string='Check',
     )
     
+    # Campo para pagos parciales (compatible con sr_partial_invoice_payment)
+    sr_is_partial = fields.Boolean(
+        string="Sr Is Partial", 
+        default=False,
+        help="Marks this payment as partial for reconciliation purposes"
+    )
+    
     def _check_payment_method_line_id(self):
         return super()._check_payment_method_line_id()
 
@@ -59,69 +66,78 @@ class AccountPayment(models.Model):
             self.is_internal_transfer = True
 
     # NUEVO: Método personalizado para crear asientos compatibles
-    def move_create_custom(self, paired_payment=None):
-        """
-        Crear asientos de transferencia interna COMPATIBLE con Odoo estándar
-        """
-        # Usar el método estándar de Odoo para crear el asiento
-        self._prepare_move_line_default_vals()
-        move = self.env['account.move'].create(self._prepare_internal_transfer_move_vals())
-        
-        # Asignar el asiento al pago
-        self.move_id = move
-        
-        return move
+    # def move_create_custom(self, paired_payment=None):
+    #     """
+    #     Crear asientos de transferencia interna COMPATIBLE con Odoo estándar
+    #     """
+    #     # Usar el método estándar de Odoo para crear el asiento
+    #     self._prepare_move_line_default_vals()
+    #     move = self.env['account.move'].create(self._prepare_internal_transfer_move_vals())
+    #
+    #     # Asignar el asiento al pago
+    #     self.move_id = move
+    #
+    #     return move
 
-    def _prepare_internal_transfer_move_vals(self):
-        """
-        Preparar valores del asiento para transferencia interna COMPATIBLE
-        """
-        # Obtener cuentas correctas según el tipo de diario
-        source_account = self._get_source_account()
-        destination_account = self._get_destination_account()
-        
-        # Preparar líneas del asiento
-        line_vals = []
-        
-        # Línea de débito (salida de dinero)
-        debit_line = {
-            'name': self.ref or _('Internal Transfer from Multiple Payments'),
-            'account_id': destination_account.id,
-            'debit': self.amount,
-            'credit': 0.0,
-            'partner_id': self.partner_id.id,
-            'currency_id': self.currency_id.id if self.currency_id != self.company_currency_id else False,
-            'amount_currency': self.amount if self.currency_id != self.company_currency_id else 0.0,
-        }
-        
-        # Línea de crédito (entrada de dinero)
-        credit_line = {
-            'name': self.ref or _('Internal Transfer from Multiple Payments'),
-            'account_id': source_account.id,
-            'debit': 0.0,
-            'credit': self.amount,
-            'partner_id': self.partner_id.id,
-            'currency_id': self.currency_id.id if self.currency_id != self.company_currency_id else False,
-            'amount_currency': -self.amount if self.currency_id != self.company_currency_id else 0.0,
-        }
-        
-        line_vals.extend([
-            (0, 0, debit_line),
-            (0, 0, credit_line),
-        ])
-        
-        # Valores del asiento
-        move_vals = {
-            'date': self.date,
-            'ref': self.ref or _('Internal Transfer from Multiple Payments'),
-            'journal_id': self.journal_id.id,
-            'currency_id': self.currency_id.id,
-            'partner_id': self.partner_id.id,
-            'line_ids': line_vals,
-            'payment_id': self.id,
-        }
-        
-        return move_vals
+    # def _prepare_internal_transfer_move_vals(self):
+    #     """
+    #     Preparar valores del asiento para transferencia interna COMPATIBLE
+    #     Asegura que currency_id nunca sea NULL para evitar errores de base de datos.
+    #     """
+    #     # Obtener cuentas correctas según el tipo de diario
+    #     source_account = self._get_source_account()
+    #     destination_account = self._get_destination_account()
+    #
+    #     # Preparar líneas del asiento
+    #     line_vals = []
+    #
+    #     # Determinar la moneda a usar - nunca debe ser None/False
+    #     # Si currency_id es None, usar company_currency_id como fallback
+    #     currency_id = self.currency_id.id if self.currency_id else self.company_currency_id.id
+    #
+    #     # Validar que tenemos una moneda válida
+    #     if not currency_id:
+    #         raise ValidationError(_('No se pudo determinar la moneda para el asiento. Verifique la configuración.'))
+    #
+    #     # Línea de débito (salida de dinero)
+    #     debit_line = {
+    #         'name': self.ref or _('Internal Transfer from Multiple Payments'),
+    #         'account_id': destination_account.id,
+    #         'debit': self.amount,
+    #         'credit': 0.0,
+    #         'partner_id': self.partner_id.id if self.partner_id else False,
+    #         'currency_id': currency_id,  # Siempre usar un ID válido
+    #         'amount_currency': self.amount if self.currency_id != self.company_currency_id else 0.0,
+    #     }
+    #
+    #     # Línea de crédito (entrada de dinero)
+    #     credit_line = {
+    #         'name': self.ref or _('Internal Transfer from Multiple Payments'),
+    #         'account_id': source_account.id,
+    #         'debit': 0.0,
+    #         'credit': self.amount,
+    #         'partner_id': self.partner_id.id if self.partner_id else False,
+    #         'currency_id': currency_id,  # Siempre usar un ID válido
+    #         'amount_currency': -self.amount if self.currency_id != self.company_currency_id else 0.0,
+    #     }
+    #
+    #     line_vals.extend([
+    #         (0, 0, debit_line),
+    #         (0, 0, credit_line),
+    #     ])
+    #
+    #     # Valores del asiento
+    #     move_vals = {
+    #         'date': self.date,
+    #         'ref': self.ref or _('Internal Transfer from Multiple Payments'),
+    #         'journal_id': self.journal_id.id,
+    #         'currency_id': currency_id,  # Usar la misma moneda validada
+    #         'partner_id': self.partner_id.id if self.partner_id else False,
+    #         'line_ids': line_vals,
+    #         'payment_id': self.id,
+    #     }
+    #
+    #     return move_vals
 
     def _get_source_account(self):
         """Obtener cuenta de origen según el diario"""
@@ -132,7 +148,7 @@ class AccountPayment(models.Model):
 
     def _get_destination_account(self):
         """Obtener cuenta de destino según el diario de destino"""
-        destination_journal = self.env['account.journal'].browse(self.destination_journal_id)
+        destination_journal = self.env['account.journal'].browse(self.destination_journal_id.id)
         return destination_journal.default_account_id
 
     # OVERRIDE del método problemático para compatibilidad
@@ -146,71 +162,82 @@ class AccountPayment(models.Model):
             return super()._create_paired_internal_transfer_payment()
         
     def action_post(self):
-        _logger.info("========= Antes del action_post ============")
-        _logger.info(self.currency_id)
-        _logger.info(self.currency_id.name)
-
-        super().action_post()
-
-        _logger.info("========= Despues del action_post ============")
-
-        _logger.info(self.currency_id)
-        _logger.info(self.currency_id.name)
-
-    def _create_paired_internal_transfer_payment_mps(self):
         """
-        Versión específica para multiple_payments que es compatible con Internal Transfer FIX
+        Sobrescribir action_post para preservar currency_rate personalizado
         """
-        for payment in self:
-            if not payment.paired_internal_transfer_payment_id:
-                # Obtener datos del método de pago de multiple_payments
-                payment_method = self._get_payment_method_from_aggregator()
-                
-                # Configurar campos de destino para Internal Transfer FIX
-                destination_currency = payment.destination_journal_id.currency_id or payment.company_currency_id
-                
-                # Calcular amount_destino según la lógica de multiple_payments
-                if payment_method and payment_method._checkSameCurrency():
-                    amount_destino = payment.amount
-                else:
-                    # Aplicar conversión usando datos de multiple_payments
-                    amount_destino = payment_method.amount if payment_method else payment.amount
-                
-                paired_payment = payment.copy({
-                    'journal_id': payment.destination_journal_id.id,
-                    'destination_journal_id': payment.journal_id.id,
-                    'currency_id': destination_currency.id,
-                    'amount': amount_destino,
-                    'amount_destino': payment.amount,  # Para Internal Transfer FIX
-                    'currency_destino_id': payment.currency_id.id,  # Para Internal Transfer FIX
-                    'payment_type': 'inbound' if payment.payment_type == 'outbound' else 'outbound',
-                    'move_id': False,
-                    'ref': payment.ref,
-                    'paired_internal_transfer_payment_id': payment.id,
-                    'date': payment.date,
-                    'date_mps': payment.date_mps,
-                    'payment_aggregator_id': payment.payment_aggregator_id.id,
-                    'partner_id': payment.partner_id.id,
-                    'partner_mps_id': payment.partner_mps_id.id,
+        _logger.info("=== action_post EJECUTADO ===")
+        _logger.info("Payment ID: %s", self.id)
+        _logger.info("Currency_rate ANTES de action_post: %s", self.currency_rate)
+        
+        # Guardar el currency_rate personalizado ANTES de cualquier procesamiento
+        custom_currency_rate = self.currency_rate
+        
+        # Ejecutar action_post normal (que incluye tchistorico)
+        result = super().action_post()
+        
+        # Restaurar el currency_rate personalizado DESPUÉS de action_post
+        if custom_currency_rate != 1.0:  # Solo si no es el valor por defecto
+            _logger.info("Restaurando currency_rate personalizado: %s", custom_currency_rate)
+            self.write({
+                'currency_rate': custom_currency_rate
+            })
+            
+            # También actualizar el asiento contable
+            if self.move_id:
+                self.move_id.write({
+                    'currency_rate': custom_currency_rate
                 })
                 
-                # Crear asiento usando método personalizado COMPATIBLE
-                # paired_payment.move_create_custom(payment)
-                paired_payment.move_id._post(soft=False)
-                payment.paired_internal_transfer_payment_id = paired_payment
-                
-                # Mensajes de enlace
-                body = _("This payment has been created from:") + payment._get_html_link()
-                paired_payment.message_post(body=body)
-                body = _("A second payment has been created:") + paired_payment._get_html_link()
-                payment.message_post(body=body)
-                
-                # Reconciliar usando la lógica estándar
-                lines = (payment.move_id.line_ids + paired_payment.move_id.line_ids).filtered(
-                    lambda l: l.account_id == payment.destination_account_id and not l.reconciled
-                )
-                if lines:
-                    lines.reconcile()
+                # Recalcular las líneas del asiento con el currency_rate correcto
+                self._recompute_payment_lines(custom_currency_rate)
+        
+        _logger.info("Currency_rate DESPUÉS de action_post: %s", self.currency_rate)
+        return result
+    
+    def _recompute_payment_lines(self, currency_rate):
+        """
+        Recalcular las líneas del asiento con el currency_rate correcto
+        """
+        if not self.move_id:
+            return
+            
+        _logger.info("Recalculando líneas del asiento con currency_rate: %s", currency_rate)
+        
+        # Aquí puedes agregar la lógica específica para recalcular las líneas
+        # basándote en el currency_rate personalizado
+
+    # def _create_internal_transfer_move(self):
+    #     """
+    #     Crear asiento para transferencia interna con currency_id válido
+    #     """
+    #     move_vals = self._prepare_internal_transfer_move_vals()
+    #     move = self.env['account.move'].create(move_vals)
+    #     self.move_id = move
+    #     return move
+
+    def _create_payment_move(self):
+        """
+        Crear asiento para pago normal con currency_id válido
+        """
+        # Usar el método estándar pero con validaciones adicionales
+        move_vals = self._prepare_move_line_default_vals()
+        
+        # Asegurar que todas las líneas tengan currency_id válido
+        for line_vals in move_vals:
+            if 'currency_id' not in line_vals or not line_vals['currency_id']:
+                line_vals['currency_id'] = self.company_currency_id.id
+        
+        move = self.env['account.move'].create({
+            'date': self.date,
+            'ref': self.ref,
+            'journal_id': self.journal_id.id,
+            'currency_id': self.currency_id.id,
+            'partner_id': self.partner_id.id,
+            'line_ids': [(0, 0, line_vals) for line_vals in move_vals],
+            'payment_id': self.id,
+        })
+        self.move_id = move
+        return move
 
     def _get_payment_method_from_aggregator(self):
         """
@@ -228,17 +255,17 @@ class AccountPayment(models.Model):
         result = super(AccountPayment, self).create(values)
         
         # Validamos tipo de transaccion
-        if result.is_internal_transfer and result.transaction_type == False:
-            result.write({
-                "transaction_type":"internal_transfer"
-            })
-
-        # Volvemos a validar
-        if values.get("is_internal_transfer") == True and not result.is_internal_transfer:
-            result.write({
-                "is_internal_transfer": True,
-                "transaction_type":"internal_transfer"
-            })
+        # if result.is_internal_transfer and result.transaction_type == False:
+        #     result.write({
+        #         "transaction_type":"internal_transfer"
+        #     })
+        #
+        # # Volvemos a validar
+        # if values.get("is_internal_transfer") == True and not result.is_internal_transfer:
+        #     result.write({
+        #         "is_internal_transfer": True,
+        #         "transaction_type":"internal_transfer"
+        #     })
         return result
     
     def _multiple_payments_action_post(self):
@@ -275,3 +302,39 @@ class AccountPayment(models.Model):
             self.date_mps = self.payment_aggregator_id.date
         elif self.date_mps:
             self.date = self.date_mps
+
+    @api.depends('currency_id', 'company_id', 'date')
+    def _compute_currency_rate(self):
+        """
+        Sobrescribir _compute_currency_rate para preservar valores personalizados
+        cuando el pago viene de un payment aggregator
+        """
+        for payment in self:
+            # Si el pago viene de un payment aggregator, NO recalcular automáticamente
+            if payment.payment_aggregator_id:
+                _logger.info(f"Preservando currency_rate personalizado para pago {payment.name}: {payment.currency_rate}")
+                # No hacer nada, mantener el valor actual
+                continue
+            
+            # Para pagos normales, usar el comportamiento estándar
+            super(AccountPayment, payment)._compute_currency_rate()
+
+    def write(self, vals):
+        """
+        Sobrescribir write para rastrear cambios en currency_rate
+        """
+        if 'currency_rate' in vals:
+            _logger.info("=== WRITE currency_rate DETECTADO ===")
+            _logger.info("Payment ID: %s", self.id)
+            _logger.info("Currency_rate ANTES: %s", self.currency_rate)
+            _logger.info("Currency_rate NUEVO: %s", vals['currency_rate'])
+            
+            # Solo mostrar stack trace si el valor está cambiando
+            if self.currency_rate != vals['currency_rate']:
+                _logger.info("*** CURRENCY_RATE CAMBIANDO DE %s A %s ***", self.currency_rate, vals['currency_rate'])
+                _logger.info("Stack trace completo:")
+                import traceback
+                for line in traceback.format_stack():
+                    _logger.info(line.strip())
+        
+        return super().write(vals)

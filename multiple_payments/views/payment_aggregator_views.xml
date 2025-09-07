@@ -95,7 +95,7 @@
                                                 <field name="payment_method_code" invisible="1"/>
                                                 <field name="exchange_rate_visibility" invisible="1"/>
                                                 <field name="exchange_rate" invisible="not exchange_rate_visibility"/>
-                                                
+                                                <field name="payment_currency_amount" readonly="1" invisible="not exchange_rate_visibility"/>
                                                 <field name="is_check" invisible="1"/>
                                                 <field name="company_id" invisible="1"/>
                                                 <field name="check_number" invisible="payment_method_code != 'new_third_party_checks'" required="is_check"/>
@@ -111,7 +111,7 @@
                             </page>
                             <page name="credits" string="Outstanding Credits/Debits">
                                 <button 
-                                    name="button_reconciliate_payments" 
+                                    name="button_reconciliate_payments_advanced"
                                     type="object"
                                     string="Concialite" 
                                     class="oe_highlight fa m-1" 
