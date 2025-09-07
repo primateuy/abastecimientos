@@ -1245,9 +1245,48 @@ class PaymentAggregator(models.Model):
    
     @api.onchange('customer_id', 'currency_id')
     def filter_credit_moves(self):
-        self.mps_credits_line_ids = self.search_account_move_line()
-        self.set_account_move_line(self.mps_credits_line_ids)
+        """
+        Filtra las líneas contables cuando cambia el cliente o la moneda.
+        
+        Este método busca las líneas contables pendientes de pago para el cliente
+        y moneda seleccionados, y crea registros temporales para mostrar en la vista.
+        """
+        # Buscar líneas contables pendientes
+        credit_lines = self.search_account_move_line()
+        _logger.info(f"Líneas contables encontradas: {len(credit_lines)} para cliente {self.customer_id} y moneda {self.currency_id}")
+        
+        # Asignar las líneas encontradas
+        self.mps_credits_line_ids = credit_lines
+        
+        # Limpiar registros de agregador existentes
+        self.account_move_line_payment_agg_ids = [(5, 0, 0)]
+        
+        # Crear registros temporales para mostrar en la vista (solo si hay líneas)
+        if credit_lines and self.id:  # Solo si el registro ya tiene ID (no es nuevo)
+            self.set_account_move_line(credit_lines)
+        elif credit_lines and not self.id:  # Si es un registro nuevo, crear registros temporales
+            # Crear registros temporales que se guardarán cuando se guarde el registro principal
+            temp_aggregator_ids = []
+            for credit_line in credit_lines:
+                if credit_line.amount_residual != 0 and credit_line.parent_state != 'cancel':
+                    # Crear registro temporal sin guardar en la base de datos
+                    temp_record = self.env['account.move.line.payment.aggregator'].new({
+                        'account_move_line_id': credit_line.id,
+                        'payment_aggregator_id': False,  # Se asignará cuando se guarde
+                        'payment_aggregator_amount_currency': credit_line.amount_currency,
+                        'payment_aggregator_amount_residual': credit_line.amount_residual_currency
+                    })
+                    temp_data = {
+                        'account_move_line_id': credit_line.id,
+                        'payment_aggregator_amount_currency': credit_line.amount_currency,
+                        'payment_aggregator_amount_residual': credit_line.amount_residual_currency
+                    }
+                    _logger.info(f"Creando datos temporales para línea {credit_line.id}: {temp_data}")
+                    temp_aggregator_ids.append((0, 0, temp_data))
+            _logger.info(f"Total de registros temporales creados: {len(temp_aggregator_ids)}")
+            self.account_move_line_payment_agg_ids = temp_aggregator_ids
 
+        # Buscar diario intermedio para la moneda seleccionada
         if self.currency_id:
             intermediate_diary = self.env["account.journal.aggregator"].search([
                 ('company_id','=',self.env.company.id),
@@ -1269,17 +1308,37 @@ class PaymentAggregator(models.Model):
         return self.env['account.move.line'].search(self.assign_domain())
    
     def set_account_move_line(self, credit_lines=False):
+        """
+        Crea registros de agregador de pago para las líneas contables seleccionadas.
+        
+        Este método crea registros de referencia que apuntan a las líneas contables originales
+        sin crear nuevas líneas contables, evitando así problemas con fechas de bloqueo de impuestos.
+        
+        Args:
+            credit_lines: Lista de líneas contables a procesar
+        """
         aggregator_ids = []
         if credit_lines:
             for credit_line in credit_lines:
+                # Validar que la línea contable sea válida y tenga ID
+                if not credit_line or not credit_line.id:
+                    _logger.warning(f"Línea contable inválida o sin ID: {credit_line}")
+                    continue
+                    
                 if credit_line.amount_residual != 0 and credit_line.parent_state != 'cancel':
-                    aggregator_record = self.env['account.move.line.payment.aggregator'].create({
-                        'account_move_line_id': credit_line.id,
-                        'move_id': credit_line.move_id.id,
-                        'payment_aggregator_amount_currency': credit_line.amount_currency,
-                        'payment_aggregator_amount_residual': credit_line.amount_residual_currency
-                    })
-                    aggregator_ids.append(aggregator_record.id if aggregator_record.id else aggregator_record.origin)
+                    try:
+                        # Crear el registro de referencia sin crear nuevas líneas contables
+                        aggregator_record = self.env['account.move.line.payment.aggregator'].create({
+                            'account_move_line_id': credit_line.id,
+                            'payment_aggregator_id': self.id,
+                            'payment_aggregator_amount_currency': credit_line.amount_currency,
+                            'payment_aggregator_amount_residual': credit_line.amount_residual_currency
+                        })
+                        aggregator_ids.append(aggregator_record.id)
+                        _logger.info(f"Registro creado exitosamente para línea contable ID: {credit_line.id}")
+                    except Exception as e:
+                        _logger.error(f"Error creando registro para línea contable ID {credit_line.id}: {e}")
+                        continue
         self.account_move_line_payment_agg_ids = [(6, 0, aggregator_ids)]
    
     def button_open_accounting_notes(self):
@@ -1343,10 +1402,101 @@ class PaymentAggregator(models.Model):
    
     @api.model
     def create(self, values):
+        """
+        Crea un nuevo agrupador de pagos y crea los registros de agregador correspondientes.
+        """
         values['company_id'] = self.env.company.id
+        
+        # Extraer los registros temporales de agregador si existen
+        temp_aggregator_data = []
+        if 'account_move_line_payment_agg_ids' in values:
+            temp_aggregator_data = values.pop('account_move_line_payment_agg_ids')
+        
         result = super().create(values)
         result.name = self.env['ir.sequence'].next_by_code('aggregator.sequence')
+        
+        # Debug: Verificar qué datos tenemos disponibles
+        _logger.info(f"=== DEBUG CREATE ===")
+        _logger.info(f"result.mps_credits_line_ids: {result.mps_credits_line_ids}")
+        _logger.info(f"len(result.mps_credits_line_ids): {len(result.mps_credits_line_ids)}")
+        _logger.info(f"temp_aggregator_data: {temp_aggregator_data}")
+        _logger.info(f"len(temp_aggregator_data): {len(temp_aggregator_data) if temp_aggregator_data else 0}")
+        
+        # Crear registros de agregador después de que el registro principal tenga ID
+        # Usar mps_credits_line_ids directamente en lugar de datos temporales
+        if result.mps_credits_line_ids:
+            _logger.info(f"Creando registros de agregador para {len(result.mps_credits_line_ids)} líneas contables")
+            result.set_account_move_line(result.mps_credits_line_ids)
+        elif temp_aggregator_data:
+            _logger.info(f"Procesando {len(temp_aggregator_data)} registros temporales de agregador")
+            # Procesar los datos temporales que incluyen las modificaciones del usuario
+            account_move_line_ids = []
+            for i, command in enumerate(temp_aggregator_data):
+                _logger.info(f"Procesando comando {i}: {command}")
+                if command[0] == 0:  # create command
+                    command_data = command[2]
+                    # Si el usuario editó el importe, usar ese valor
+                    if 'payment_aggregator_total_import' in command_data:
+                        # Buscar la línea contable correspondiente usando el índice
+                        if result.customer_id and result.currency_id:
+                            credit_lines = result.search_account_move_line()
+                            if i < len(credit_lines):
+                                credit_line = credit_lines[i]
+                                # Crear registro con el importe editado por el usuario
+                                aggregator_data = {
+                                    'account_move_line_id': credit_line.id,
+                                    'payment_aggregator_id': result.id,
+                                    'payment_aggregator_amount_currency': credit_line.amount_currency,
+                                    'payment_aggregator_amount_residual': command_data['payment_aggregator_total_import']
+                                }
+                                _logger.info(f"Creando registro con importe editado: {aggregator_data}")
+                                self.env['account.move.line.payment.aggregator'].create(aggregator_data)
+                                account_move_line_ids.append(credit_line.id)
+                    elif 'account_move_line_id' in command_data and command_data['account_move_line_id']:
+                        # Si tiene account_move_line_id, usar directamente
+                        command_data['payment_aggregator_id'] = result.id
+                        _logger.info(f"Creando registro con datos completos: {command_data}")
+                        self.env['account.move.line.payment.aggregator'].create(command_data)
+                        account_move_line_ids.append(command_data['account_move_line_id'])
+            
+            # Asignar las líneas contables al registro principal
+            if account_move_line_ids:
+                _logger.info(f"Asignando {len(account_move_line_ids)} líneas contables al registro principal")
+                result.with_context(skip_aggregator_sync=True).mps_credits_line_ids = [(6, 0, account_move_line_ids)]
+        
         return result
+    
+    def write(self, values):
+        """
+        Actualiza el agrupador de pagos y sincroniza los registros de agregador.
+        """
+        res = super().write(values)
+        
+        # Solo procesar si realmente hay cambios en las líneas contables
+        # y no estamos en el proceso de creación inicial
+        if 'mps_credits_line_ids' in values and not self._context.get('skip_aggregator_sync'):
+            _logger.info(f"Actualizando registros de agregador para {len(self.mps_credits_line_ids)} líneas contables")
+            
+            # Verificar si realmente hay cambios en las líneas contables
+            current_line_ids = set(self.account_move_line_payment_agg_ids.mapped('account_move_line_id.id'))
+            new_line_ids = set(self.mps_credits_line_ids.ids)
+            
+            if current_line_ids != new_line_ids:
+                _logger.info(f"Detectados cambios en líneas contables. Actuales: {len(current_line_ids)}, Nuevas: {len(new_line_ids)}")
+                # Solo limpiar y recrear si realmente hay cambios
+                if self.mps_credits_line_ids:
+                    # Limpiar registros existentes solo si hay nuevas líneas
+                    self.account_move_line_payment_agg_ids = [(5, 0, 0)]
+                    # Crear nuevos registros
+                    self.set_account_move_line(self.mps_credits_line_ids)
+                else:
+                    # Si no hay líneas contables, limpiar registros de agregador
+                    _logger.info("No hay líneas contables, limpiando registros de agregador")
+                    self.account_move_line_payment_agg_ids = [(5, 0, 0)]
+            else:
+                _logger.info("No hay cambios en las líneas contables, omitiendo actualización")
+        
+        return res
    
     @api.onchange('receiptbook_id')
     def _validate_recieptbook (self):
