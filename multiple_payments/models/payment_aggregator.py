@@ -1267,7 +1267,8 @@ class PaymentAggregator(models.Model):
         elif credit_lines and not self.id:  # Si es un registro nuevo, crear registros temporales
             # Crear registros temporales que se guardarán cuando se guarde el registro principal
             temp_aggregator_ids = []
-            for credit_line in credit_lines:
+            # Limitar la creación temporal a las primeras 80 líneas encontradas
+            for credit_line in credit_lines[:100]:
                 if credit_line.amount_residual != 0 and credit_line.parent_state != 'cancel':
                     # Crear registro temporal sin guardar en la base de datos
                     temp_record = self.env['account.move.line.payment.aggregator'].new({
@@ -1319,7 +1320,8 @@ class PaymentAggregator(models.Model):
         """
         aggregator_ids = []
         if credit_lines:
-            for credit_line in credit_lines:
+            # Limitar la creación a las primeras 80 líneas encontradas
+            for credit_line in credit_lines[:100]:
                 # Validar que la línea contable sea válida y tenga ID
                 if not credit_line or not credit_line.id:
                     _logger.warning(f"Línea contable inválida o sin ID: {credit_line}")
@@ -1425,13 +1427,17 @@ class PaymentAggregator(models.Model):
         # Crear registros de agregador después de que el registro principal tenga ID
         # Usar mps_credits_line_ids directamente en lugar de datos temporales
         if result.mps_credits_line_ids:
-            _logger.info(f"Creando registros de agregador para {len(result.mps_credits_line_ids)} líneas contables")
-            result.set_account_move_line(result.mps_credits_line_ids)
+            _logger.info(f"Creando registros de agregador para {len(result.mps_credits_line_ids)} líneas contables (se limitarán a 80)")
+            # Limitar la creación a las primeras 80 líneas
+            result.set_account_move_line(result.mps_credits_line_ids[:80])
         elif temp_aggregator_data:
             _logger.info(f"Procesando {len(temp_aggregator_data)} registros temporales de agregador")
             # Procesar los datos temporales que incluyen las modificaciones del usuario
             account_move_line_ids = []
             for i, command in enumerate(temp_aggregator_data):
+                # Limitar el procesamiento a las primeras 80 entradas temporales
+                if i >= 80:
+                    break
                 _logger.info(f"Procesando comando {i}: {command}")
                 if command[0] == 0:  # create command
                     command_data = command[2]
@@ -1439,7 +1445,8 @@ class PaymentAggregator(models.Model):
                     if 'payment_aggregator_total_import' in command_data:
                         # Buscar la línea contable correspondiente usando el índice
                         if result.customer_id and result.currency_id:
-                            credit_lines = result.search_account_move_line()
+                            # Limitar la búsqueda al mismo tope de 80 para mantener correspondencia
+                            credit_lines = result.search_account_move_line()[:80]
                             if i < len(credit_lines):
                                 credit_line = credit_lines[i]
                                 # Crear registro con el importe editado por el usuario
@@ -3247,6 +3254,27 @@ class PaymentAggregator(models.Model):
     def button_reconciliate_payments_proportional(self):
         # Implementa la lógica para la reconciliación proporcional aquí
         pass
+
+    def button_add_invoices(self):
+        """
+        Abre el wizard para agregar facturas al agrupador actual.
+        
+        Returns:
+            dict: Acción para abrir el wizard
+        """
+        self.ensure_one()
+        
+        action = {
+            'name': 'Agregar facturas al agrupador',
+            'type': 'ir.actions.act_window',
+            'res_model': 'mps.payment.aggregator.add.invoices.wizard',
+            'view_mode': 'form',
+            'target': 'new',
+            'context': {
+                'active_id': self.id,
+            }
+        }
+        return action
 
     def button_reconciliate_payments_partial(self):
         """
