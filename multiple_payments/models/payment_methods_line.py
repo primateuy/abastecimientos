@@ -73,8 +73,6 @@ class MPPaymentMethodsLine(models.Model):
     exchange_rate = fields.Float(
         string='Exchange Rate',
         digits=(16, 6),
-        compute='_compute_exchange_rate',
-        store=True,
         help="Exchange rate between payment currency and aggregator currency"
     )
     
@@ -86,9 +84,34 @@ class MPPaymentMethodsLine(models.Model):
         store=True,
         help="Amount converted to the payment method currency (diario currency)"
     )
-    
+    # NUEVO CAMPO: Importe en moneda de la compañía
+    amount_company_currency = fields.Monetary(
+        string='Amount in Company Currency',
+        currency_field='company_currency_id',
+        help="Amount converted to the company currency using the exchange rate of the day",
+    )
+
+    # Campo para la moneda de la compañía (no almacenado, solo para referencia)
+    company_currency_id = fields.Many2one(
+        'res.currency',
+        string='Company Currency',
+        related='company_id.currency_id',
+        store=False,
+        help="Company currency for reference"
+    )
+
     exchange_rate_visibility = fields.Boolean(
         default=False,
+    )
+    
+    # Campos para rastrear si el usuario editó los valores
+    _user_edited_exchange_rate = fields.Boolean(
+        default=False,
+        help="Indica si el usuario editó manualmente el exchange_rate"
+    )
+    _user_edited_amount_company_currency = fields.Boolean(
+        default=False,
+        help="Indica si el usuario editó manualmente el amount_company_currency"
     )
 
     mps_payment_aggregator_id = fields.Many2one(
@@ -136,14 +159,17 @@ class MPPaymentMethodsLine(models.Model):
         default=lambda self: self.env.company
         )
 
-    # MÉTODO NUEVO: Computar exchange_rate como currency_rate de account_move
-    @api.depends('currency_id', 'payment_aggregator_currency_id', 'date', 'payment_amount', 'amount')
-    def _compute_exchange_rate(self):
+    # MÉTODO NUEVO: Calcular exchange_rate automáticamente solo cuando sea necesario
+    def _auto_compute_exchange_rate(self):
         """
-        Computar la tasa de cambio de manera similar a currency_rate en account_move.
-        Se actualiza automáticamente cuando cambian las monedas, fecha, o importes.
+        Calcular la tasa de cambio automáticamente solo si no hay valor establecido.
+        Este método se puede llamar desde onchange pero no sobrescribe valores existentes.
         """
         for record in self:
+            # Solo calcular si no hay valor establecido o es 1.0 (valor por defecto)
+            if record.exchange_rate and record.exchange_rate != 1.0:
+                continue
+                
             if not record.currency_id or not record.payment_aggregator_currency_id:
                 record.exchange_rate = 1.0
                 continue
@@ -200,6 +226,108 @@ class MPPaymentMethodsLine(models.Model):
             # Donde payment_amount está en moneda del diario y amount en moneda del agrupador
             record.payment_currency_amount = record.payment_amount / record.amount
 
+    # MÉTODO NUEVO: Calcular importe en moneda de la compañía automáticamente solo cuando sea necesario
+    def _auto_compute_amount_company_currency(self):
+        """
+        Calcular el importe en moneda de la compañía automáticamente solo si no hay valor establecido.
+        Este método se puede llamar desde onchange pero no sobrescribe valores existentes.
+        Usa el campo 'amount' que es el importe en la moneda del agrupador.
+        Si la moneda del agrupador es distinta de la compañía, usa la tasa de cambio del día.
+        """
+        for record in self:
+            # Solo calcular si no hay valor establecido o es 0.0 (valor por defecto)
+            if record.amount_company_currency and record.amount_company_currency != 0.0:
+                continue
+                
+            if not record.amount or record.amount <= 0:
+                record.amount_company_currency = 0.0
+                continue
+
+            # Obtener la moneda de la compañía
+            company_currency = record.company_currency_id
+            if not company_currency:
+                record.amount_company_currency = 0.0
+                continue
+
+            # Si la moneda del agrupador es igual a la de la compañía
+            if (record.payment_aggregator_currency_id and
+                    record.payment_aggregator_currency_id.id == company_currency.id):
+                # El amount ya está en la moneda de la compañía
+                record.amount_company_currency = record.amount
+                continue
+
+            # Si la moneda del agrupador es distinta de la compañía, usar tasa de cambio del día
+            try:
+                date = record.date or fields.Date.today()
+                company = record.env.company
+
+                # Convertir de la moneda del agrupador a la moneda de la compañía
+                converted_amount = record.payment_aggregator_currency_id._convert(
+                    record.amount,
+                    company_currency,
+                    company,
+                    date
+                )
+
+                record.amount_company_currency = converted_amount
+
+            except Exception as e:
+                _logger.warning("Error computing amount in company currency: %s", str(e))
+                # Fallback: usar exchange_rate si está disponible
+                if record.exchange_rate and record.exchange_rate > 0:
+                    record.amount_company_currency = record.amount * record.exchange_rate
+                else:
+                    record.amount_company_currency = record.amount
+
+    # MÉTODO NUEVO: Recalcular amount_company_currency cuando cambia amount
+    def _recalculate_amount_company_currency(self):
+        """
+        Recalcular el importe en moneda de la compañía cuando cambia el amount.
+        Este método siempre recalcula el valor, sobrescribiendo el existente.
+        Usa el campo 'amount' que es el importe en la moneda del agrupador.
+        Si la moneda del agrupador es distinta de la compañía, usa la tasa de cambio del día.
+        """
+        for record in self:
+            if not record.amount or record.amount <= 0:
+                record.amount_company_currency = 0.0
+                continue
+
+            # Obtener la moneda de la compañía
+            company_currency = record.company_currency_id
+            if not company_currency:
+                record.amount_company_currency = 0.0
+                continue
+
+            # Si la moneda del agrupador es igual a la de la compañía
+            if (record.payment_aggregator_currency_id and
+                    record.payment_aggregator_currency_id.id == company_currency.id):
+                # El amount ya está en la moneda de la compañía
+                record.amount_company_currency = record.amount
+                continue
+
+            # Si la moneda del agrupador es distinta de la compañía, usar tasa de cambio del día
+            try:
+                date = record.date or fields.Date.today()
+                company = record.env.company
+
+                # Convertir de la moneda del agrupador a la moneda de la compañía
+                converted_amount = record.payment_aggregator_currency_id._convert(
+                    record.amount,
+                    company_currency,
+                    company,
+                    date
+                )
+
+                record.amount_company_currency = converted_amount
+
+            except Exception as e:
+                _logger.warning("Error computing amount in company currency: %s", str(e))
+                # Fallback: usar exchange_rate si está disponible
+                if record.exchange_rate and record.exchange_rate > 0:
+                    record.amount_company_currency = record.amount * record.exchange_rate
+                else:
+                    record.amount_company_currency = record.amount
+
     # MODIFICACIÓN 2: Onchange para amount que recalcula exchange_rate
     @api.onchange('amount')
     def onchange_amount(self):
@@ -207,7 +335,15 @@ class MPPaymentMethodsLine(models.Model):
         Recalcular exchange_rate cuando se modifica el campo amount.
         Este método permite al usuario modificar directamente el amount y 
         que se recalcule automáticamente la tasa de cambio.
+        CORREGIDO: También recalcula amount_company_currency cuando cambia amount.
+        NUEVO: No se ejecuta durante operaciones de guardado.
         """
+        # CORREGIDO: No ejecutar durante operaciones de guardado
+        if (self._context.get('skip_onchange') or 
+            self._context.get('from_write') or 
+            self._context.get('skip_payment_methods_onchange')):
+            return
+            
         if not self.amount or not self.payment_amount or self.payment_amount <= 0:
             return
             
@@ -215,7 +351,16 @@ class MPPaymentMethodsLine(models.Model):
         new_exchange_rate = self.amount / self.payment_amount
         
         # Actualizar el exchange_rate directamente (sin trigger del compute)
-        self._origin.exchange_rate = new_exchange_rate
+        self.exchange_rate = new_exchange_rate
+        
+        # CORREGIDO: Recalcular amount_company_currency cuando cambia amount
+        # Esto es necesario porque amount es la base para el cálculo
+        self._recalculate_amount_company_currency()
+        
+        # NUEVO: Marcar que este campo fue editado por el usuario
+        self._user_edited_exchange_rate = True
+        # NO marcar amount_company_currency como editado por el usuario aquí
+        # porque se calcula automáticamente cuando cambia amount
 
     # MODIFICACIÓN 3: Onchange para exchange_rate que recalcula amount
     @api.onchange('exchange_rate')
@@ -224,7 +369,15 @@ class MPPaymentMethodsLine(models.Model):
         Recalcular amount cuando se modifica el campo exchange_rate.
         Este método permite al usuario modificar directamente la tasa de cambio
         y que se recalcule automáticamente el amount.
+        CORREGIDO: También calcula amount_company_currency automáticamente.
+        NUEVO: No se ejecuta durante operaciones de guardado.
         """
+        # CORREGIDO: No ejecutar durante operaciones de guardado
+        if (self._context.get('skip_onchange') or 
+            self._context.get('from_write') or 
+            self._context.get('skip_payment_methods_onchange')):
+            return
+            
         if not self.exchange_rate or not self.payment_amount or self.exchange_rate <= 0:
             return
             
@@ -233,10 +386,37 @@ class MPPaymentMethodsLine(models.Model):
         
         # Actualizar el amount directamente
         self.amount = new_amount
+        
+        # Calcular automáticamente amount_company_currency si no hay valor establecido
+        self._auto_compute_amount_company_currency()
+        
+        # NUEVO: Marcar que este campo fue editado por el usuario
+        self._user_edited_exchange_rate = True
+
+    # NUEVO: Onchange para amount_company_currency
+    @api.onchange('amount_company_currency')
+    def onchange_amount_company_currency(self):
+        """
+        Marcar cuando el usuario edita directamente amount_company_currency.
+        """
+        # CORREGIDO: No ejecutar durante operaciones de guardado
+        if (self._context.get('skip_onchange') or 
+            self._context.get('from_write') or 
+            self._context.get('skip_payment_methods_onchange')):
+            return
+            
+        # NUEVO: Marcar que este campo fue editado por el usuario
+        self._user_edited_amount_company_currency = True
 
     # Metodo para asignar el dominio de los metodos de pago
     @api.onchange('account_journal_id')
     def onchange_account_journal_id(self):
+        # CORREGIDO: No ejecutar durante operaciones de guardado
+        if (self._context.get('skip_onchange') or 
+            self._context.get('from_write') or 
+            self._context.get('skip_payment_methods_onchange')):
+            return
+            
         if not self.account_journal_id:
             # Generamos el domain para el metodo de pago
             self.payment_method_domain = "[('id', 'in', %s), ('payment_method_id.code', '!=', 'in_third_party_checks')]" % self.available_payment_method_line_ids.ids
@@ -262,15 +442,25 @@ class MPPaymentMethodsLine(models.Model):
 
     @api.onchange('currency_id')
     def onchange_currency_id(self):
+        # CORREGIDO: No ejecutar durante operaciones de guardado
+        if (self._context.get('skip_onchange') or 
+            self._context.get('from_write') or 
+            self._context.get('skip_payment_methods_onchange')):
+            return
+            
         if self.currency_id:
             if self.payment_aggregator_currency_id:
                 self.exchange_rate_visibility = self._checkSameCurrency() == False
                 if self.exchange_rate_visibility:
-                    # CORREGIDO: Usar el método mejorado para obtener tasa
-                    self._compute_exchange_rate_auto()
+                    # CORREGIDO: Solo calcular automáticamente si no hay tasa establecida
+                    self._auto_compute_exchange_rate()
             
-            # Recalcular el importe con la nueva moneda
-            self.onchange_payment_amount()
+            # CORREGIDO: Solo recalcular si no hay amount establecido
+            if not self.amount and self.payment_amount:
+                self.onchange_payment_amount()
+            
+            # Calcular automáticamente amount_company_currency si no hay valor establecido
+            self._auto_compute_amount_company_currency()
 
     # MÉTODO CORREGIDO: Verificar si se usa la misma moneda
     def _checkSameCurrency(self):
@@ -311,7 +501,13 @@ class MPPaymentMethodsLine(models.Model):
         """
         Recalcular importes cuando cambia el monto del pago.
         Este método actualiza tanto amount como exchange_rate cuando se modifica payment_amount.
+        NUEVO: No se ejecuta durante operaciones de guardado.
         """
+        # CORREGIDO: No ejecutar durante operaciones de guardado
+        if (self._context.get('skip_onchange') or 
+            self._context.get('from_write') or 
+            self._context.get('skip_payment_methods_onchange')):
+            return
         
         # Si no hay monto de pago, limpiar el importe
         if not self.payment_amount:
@@ -341,15 +537,15 @@ class MPPaymentMethodsLine(models.Model):
                 
                 # Actualizar la tasa de cambio basada en la conversión real
                 if self.payment_amount > 0:
-                    self._origin.exchange_rate = self.amount / self.payment_amount
+                    self.exchange_rate = self.amount / self.payment_amount
                 
             except Exception as e:
                 _logger.warning("Error in currency conversion: %s", str(e))
                 # Fallback: usar cálculo manual
                 self.amount = self.payment_amount * self.exchange_rate
         else:
-            # Recalcular la tasa automáticamente
-            self._compute_exchange_rate_auto()
+            # Recalcular la tasa automáticamente solo si no hay valor establecido
+            self._auto_compute_exchange_rate()
             # Y luego calcular el importe
             if self.exchange_rate > 0:
                 self.amount = self.payment_amount * self.exchange_rate
@@ -357,6 +553,12 @@ class MPPaymentMethodsLine(models.Model):
     # Onchange para detectar si el metodo de pago es cheques
     @api.onchange('payment_method_id')
     def onchange_payment_method_id(self):
+        # CORREGIDO: No ejecutar durante operaciones de guardado
+        if (self._context.get('skip_onchange') or 
+            self._context.get('from_write') or 
+            self._context.get('skip_payment_methods_onchange')):
+            return
+            
         if self.payment_method_id:
             self.is_check = self.payment_method_id.code in check_codes
     

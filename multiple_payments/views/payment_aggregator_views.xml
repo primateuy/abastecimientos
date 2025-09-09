@@ -69,6 +69,7 @@
                                         <field name="payment_type"/>
                                         <field name="currency_id"/>
                                         <field name="payment_amount"/>
+                                        <field name="amount_company_currency"/>
                                         <field name="amount"/>
                                         <field name="exchange_rate"/>
                                     </tree>
@@ -96,6 +97,7 @@
                                                 <field name="exchange_rate_visibility" invisible="1"/>
                                                 <field name="exchange_rate" invisible="not exchange_rate_visibility"/>
                                                 <field name="payment_currency_amount" readonly="1" invisible="not exchange_rate_visibility"/>
+                                                <field name="amount_company_currency" readonly="1" invisible="not exchange_rate_visibility"/>
                                                 <field name="is_check" invisible="1"/>
                                                 <field name="company_id" invisible="1"/>
                                                 <field name="check_number" invisible="payment_method_code != 'new_third_party_checks'" required="is_check"/>

@@ -42,7 +42,6 @@ class MPSPaymentAggregatorInvoiceSelectorWizard(models.TransientModel):
         'account.move',
         string='Facturas Disponibles',
         help='Seleccione las facturas que desea agregar al agrupador',
-        domain='_get_invoice_domain'
     )
     
     # Campo para el dominio de facturas
@@ -254,12 +253,12 @@ class MPSPaymentAggregatorInvoiceSelectorWizard(models.TransientModel):
         _logger.info(f"Líneas de crédito encontradas para las facturas seleccionadas: {len(credit_lines)}")
         
         # Filtrar por cuentas del diario si están configuradas
-        if journal_accounts:
-            credit_lines = credit_lines.filtered(lambda l: l.account_id.id in journal_accounts)
-            _logger.info(f"Líneas después de filtrar por cuentas del diario: {len(credit_lines)}")
-        else:
-            _logger.info("No se aplicará filtro por cuentas del diario - usando todas las líneas de crédito")
-        
+        # if journal_accounts:
+        #     credit_lines = credit_lines.filtered(lambda l: l.account_id.id in journal_accounts)
+        #     _logger.info(f"Líneas después de filtrar por cuentas del diario: {len(credit_lines)}")
+        # else:
+        #     _logger.info("No se aplicará filtro por cuentas del diario - usando todas las líneas de crédito")
+
         # Excluir líneas ya agregadas
         existing_line_ids = self.payment_aggregator_id.mps_credits_line_ids.ids
         new_lines = credit_lines.filtered(lambda l: l.id not in existing_line_ids)

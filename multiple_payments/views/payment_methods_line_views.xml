@@ -24,6 +24,7 @@
                             <field name="payment_method_id" options="{'no_create': True}"/>
                             <field name="exchange_rate"/>
                             <field name="payment_currency_amount" readonly="1"/>
+                            <field name="amount_company_currency"/>
                         </group>
                     </group>
                 </sheet>
@@ -45,6 +46,7 @@
                 <field name="amount"/>
                 <field name="exchange_rate"/>
                 <field name="payment_currency_amount"/>
+                <field name="amount_company_currency"/>
             </tree>
         </field>
     </record>

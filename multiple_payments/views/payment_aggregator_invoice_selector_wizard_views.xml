@@ -29,6 +29,7 @@
                     <field name="partner_id" readonly="1"/>
                     <field name="currency_id" readonly="1"/>
                     <field name="partner_type" readonly="1"/>
+                    <field name="invoice_domain" invisible="1"/>
                 </group>
                 <group>
                     <field name="invoice_ids" 
@@ -36,6 +37,7 @@
                            widget="one2many"
                            options="{'no_create': True, 'no_create_edit': True}"
                            context="{'create': False, 'edit': False, 'delete': False}"
+                           domain="invoice_domain"
                            view_id="view_mps_payment_aggregator_invoice_selector_invoices_list"/>
                 </group>
                 <footer>

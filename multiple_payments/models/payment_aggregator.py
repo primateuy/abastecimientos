@@ -972,7 +972,7 @@ class PaymentAggregator(models.Model):
             payment_details['date'] = payment_date
             payment_details['date_mps'] = payment_date
             payment_details['amount'] = payment_method["amount"] if self.currency_id.id != self.env.company.currency_id.id else payment_method["payment_amount"]
-            payment_details['amount_destino'] = payment_method["amount"]
+            payment_details['amount_destino'] = payment_method["amount_company_currency"]
             payment_details['payment_type'] = payment_method["payment_type"]
             payment_details['payment_type_mps'] = payment_method["payment_type"]
             # payment_details['is_internal_transfer'] = True   # Marcamos
@@ -1064,23 +1064,6 @@ class PaymentAggregator(models.Model):
                         line.write({'account_id': self.get_account()})
             else:
                 payment.action_post()
-    # Modificación de asientos con fechas correctas
-        amount = payment_method["amount"]
-
-        # account_account = self.env["account.journal"].search([
-        #     ('type', '=', 'sale' if self.receiptbook_id.partner_type == "customer" else 'purchase')
-        # ], limit=1)
-        # payment.write({
-        #     "partner_type": self.receiptbook_id.partner_type,
-        #     "account_journal_id": account_account.id,
-        #     "currency_id": self.currency_id.id,
-        #     "amount_total_signed": payment_method["payment_amount"],
-        #     "amount_company_currency_signed": payment_method["payment_amount"],
-        #     # REMOVER: "currency_rate": payment_method["payment_currency_amount"]/payment_method["amount"],
-        # })
-        # payment.action_draft()
-        # payment.action_post()
-
         _logger.info(payment)
         _logger.info(payment.partner_type)
         _logger.info(self.receiptbook_id.partner_type)
@@ -1108,27 +1091,35 @@ class PaymentAggregator(models.Model):
             if line.debit > 0:
                 # Línea débito
                 # CORREGIDO: amount_currency debe ser el monto en la moneda del agrupador
-                amount_currency = float(
-                    payment_method["amount"]) if payment_method.currency_id.id == company_currency.id else float(
-                    payment_method["payment_amount"])  # Monto en moneda del agrupador
-                amount_company = amount_currency * currency_rate
-
+                if payment_method.currency_id.id == company_currency.id or aggregator_currency == company_currency:
+                    amount_currency = float(
+                        payment_method["amount"]) if payment_method.currency_id.id == company_currency.id else float(
+                        payment_method["payment_amount"])  # Monto en moneda del agrupador
+                    amount_company = amount_currency * currency_rate
+                    currency_id = payment_method.currency_id.id if aggregator_currency == company_currency else aggregator_currency
+                else:
+                    amount_company = line.debit
+                    amount_currency = float(payment_method["payment_amount"])
+                    currency_id = payment_method.currency_id.id
                 vals.update({
                     'debit': amount_company,
                     'balance': amount_company,
                     'amount_currency': amount_currency,
-                    'currency_id': payment_method.currency_id.id if aggregator_currency == company_currency else aggregator_currency,
+                    'currency_id': currency_id,
                     # CORREGIDO: Moneda del agrupador
                 })
 
             elif line.credit > 0:
                 # Línea crédito
                 # CORREGIDO: amount_currency debe ser el monto en la moneda del agrupador
-                amount_currency = float(
-                    payment_method["amount"]) if payment_method.currency_id.id == company_currency.id else float(
-                    payment_method["payment_amount"])  # Monto en moneda del agrupador
-                amount_company = amount_currency * currency_rate
-
+                if payment_method.currency_id.id == company_currency.id or aggregator_currency == company_currency:
+                    amount_currency = float(
+                        payment_method["amount"]) if payment_method.currency_id.id == company_currency.id else float(
+                        payment_method["payment_amount"])  # Monto en moneda del agrupador
+                    amount_company = amount_currency * currency_rate
+                else:
+                    amount_company = line.credit
+                    amount_currency = float(payment_method["amount"])
                 vals.update({
                     'credit': amount_company,
                     'balance': -amount_company,
@@ -1238,10 +1229,15 @@ class PaymentAggregator(models.Model):
 
     @api.depends('account_move_line_payment_agg_ids.payment_aggregator_total_import')
     def _compute_debt_allocation(self):
+        """
+        Computar la asignación de deuda basada en los importes totales de las líneas contables.
+        NO modifica otros campos para evitar efectos secundarios.
+        """
         for record in self:
             record.debt_allocation = sum(record.account_move_line_payment_agg_ids.mapped('payment_aggregator_total_import'))
-            for credit_line, agg_line in zip(record.mps_credits_line_ids, record.account_move_line_payment_agg_ids):
-                credit_line.total_import = agg_line.payment_aggregator_total_import
+            # REMOVIDO: No modificar total_import para evitar efectos secundarios
+            # for credit_line, agg_line in zip(record.mps_credits_line_ids, record.account_move_line_payment_agg_ids):
+            #     credit_line.total_import = agg_line.payment_aggregator_total_import
    
     @api.onchange('customer_id', 'currency_id', 'receiptbook_id')
     def filter_credit_moves(self):
@@ -1324,12 +1320,12 @@ class PaymentAggregator(models.Model):
             _logger.info(f"Líneas de crédito encontradas: {len(credit_lines)}")
 
             # 2. Filtrar por cuentas del diario del talonario (solo si están configuradas)
-            journal_accounts = self._get_journal_accounts(self)
-            if journal_accounts:
-                credit_lines = credit_lines.filtered(lambda l: l.account_id.id in journal_accounts)
-                _logger.info(f"Líneas después de filtrar por cuentas del diario: {len(credit_lines)}")
-            else:
-                _logger.info("No se aplicará filtro por cuentas del diario - usando todas las líneas de crédito")
+            # journal_accounts = self._get_journal_accounts(self)
+            # if journal_accounts:
+            #     credit_lines = credit_lines.filtered(lambda l: l.account_id.id in journal_accounts)
+            #     _logger.info(f"Líneas después de filtrar por cuentas del diario: {len(credit_lines)}")
+            # else:
+            #     _logger.info("No se aplicará filtro por cuentas del diario - usando todas las líneas de crédito")
             return credit_lines
 
     def _get_journal_accounts(self, aggregator):
@@ -1471,6 +1467,7 @@ class PaymentAggregator(models.Model):
     def create(self, values):
         """
         Crea un nuevo agrupador de pagos y crea los registros de agregador correspondientes.
+        SIMPLIFICADO: Solo maneja la creación básica sin lógica compleja.
         """
         values['company_id'] = self.env.company.id
         
@@ -1490,19 +1487,14 @@ class PaymentAggregator(models.Model):
         _logger.info(f"len(temp_aggregator_data): {len(temp_aggregator_data) if temp_aggregator_data else 0}")
         
         # Crear registros de agregador después de que el registro principal tenga ID
-        # Usar mps_credits_line_ids directamente en lugar de datos temporales
         if result.mps_credits_line_ids:
-            _logger.info(f"Creando registros de agregador para {len(result.mps_credits_line_ids)} líneas contables (se limitarán a 80)")
-            # Limitar la creación a las primeras 80 líneas
-            result.set_account_move_line(result.mps_credits_line_ids[:80])
+            _logger.info(f"Creando registros de agregador para {len(result.mps_credits_line_ids)} líneas contables")
+            result.set_account_move_line(result.mps_credits_line_ids)
         elif temp_aggregator_data:
             _logger.info(f"Procesando {len(temp_aggregator_data)} registros temporales de agregador")
             # Procesar los datos temporales que incluyen las modificaciones del usuario
             account_move_line_ids = []
             for i, command in enumerate(temp_aggregator_data):
-                # Limitar el procesamiento a las primeras 80 entradas temporales
-                if i >= 80:
-                    break
                 _logger.info(f"Procesando comando {i}: {command}")
                 if command[0] == 0:  # create command
                     command_data = command[2]
@@ -1510,7 +1502,6 @@ class PaymentAggregator(models.Model):
                     if 'payment_aggregator_total_import' in command_data:
                         # Buscar la línea contable correspondiente usando el índice
                         if result.customer_id and result.currency_id:
-                            # Limitar la búsqueda al mismo tope de 80 para mantener correspondencia
                             credit_lines = result.search_account_move_line() or []
                             if i < len(credit_lines):
                                 credit_line = credit_lines[i]
@@ -1519,7 +1510,8 @@ class PaymentAggregator(models.Model):
                                     'account_move_line_id': credit_line.id,
                                     'payment_aggregator_id': result.id,
                                     'payment_aggregator_amount_currency': credit_line.amount_currency,
-                                    'payment_aggregator_amount_residual': command_data['payment_aggregator_total_import']
+                                    'payment_aggregator_amount_residual': credit_line.amount_residual_currency,
+                                    'payment_aggregator_total_import': command_data['payment_aggregator_total_import']
                                 }
                                 _logger.info(f"Creando registro con importe editado: {aggregator_data}")
                                 self.env['account.move.line.payment.aggregator'].create(aggregator_data)
@@ -1541,18 +1533,40 @@ class PaymentAggregator(models.Model):
     def write(self, values):
         """
         Actualiza el agrupador de pagos y sincroniza los registros de agregador.
+        SIMPLIFICADO: Solo maneja la actualización básica sin lógica compleja.
         """
+        # NUEVO: Preservar valores de métodos de pago antes de la escritura
+        payment_methods_data = {}
+        if 'mps_payment_methods_line_ids' in values or 'mps_credits_line_ids' in values:
+            for method in self.mps_payment_methods_line_ids:
+                payment_methods_data[method.id] = {
+                    'exchange_rate': method.exchange_rate,
+                    'amount_company_currency': method.amount_company_currency,
+                    'amount': method.amount,
+                    'payment_amount': method.payment_amount,
+                    'user_edited_exchange_rate': getattr(method, '_user_edited_exchange_rate', False),
+                    'user_edited_amount_company_currency': getattr(method, '_user_edited_amount_company_currency', False)
+                }
+            _logger.info(f"Preservando datos de {len(payment_methods_data)} métodos de pago")
+        
+        # CORREGIDO: Usar contexto para evitar que se ejecuten los métodos onchange
+        # durante el guardado
+        context = dict(self._context)
+        context['skip_payment_methods_onchange'] = True
+        context['skip_onchange'] = True
+        context['from_write'] = True
+        
         res = super().write(values)
         
         # Solo procesar si realmente hay cambios en las líneas contables
         # y no estamos en el proceso de creación inicial
         if 'mps_credits_line_ids' in values and not self._context.get('skip_aggregator_sync'):
             _logger.info(f"Actualizando registros de agregador para {len(self.mps_credits_line_ids)} líneas contables")
-            
+
             # Verificar si realmente hay cambios en las líneas contables
             current_line_ids = set(self.account_move_line_payment_agg_ids.mapped('account_move_line_id.id'))
             new_line_ids = set(self.mps_credits_line_ids.ids)
-            
+
             if current_line_ids != new_line_ids:
                 _logger.info(f"Detectados cambios en líneas contables. Actuales: {len(current_line_ids)}, Nuevas: {len(new_line_ids)}")
                 # Solo limpiar y recrear si realmente hay cambios

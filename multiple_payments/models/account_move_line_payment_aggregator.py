@@ -47,7 +47,7 @@ class accountMoveLinePaymentAggregator(models.Model):
         currency_field='currency_id',
         store=True
     )
-    
+
     amount_residual_currency = fields.Monetary(
         related='account_move_line_id.amount_residual_currency',
         string='Importe Residual en Moneda',
