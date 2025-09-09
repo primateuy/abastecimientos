@@ -1,6 +1,0 @@
-id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
-access_receipt_books_group_user,receipt.books.group.user,model_mps_receipt_books,base.group_user,1,1,1,0
-access_payment_aggregator_group_user,payment.aggregator.group.admin,model_mps_payment_aggregator,base.group_user,1,1,1,0
-access_mps_payment_methods_line_group_user,mps.payment.methods.line.group.admin,model_mps_payment_methods_line,base.group_user,1,1,1,0
-access_account_move_line_payment_aggregator_group_user,account.move.line.payment.aggregator.group.admin,model_account_move_line_payment_aggregator,base.group_user,1,1,1,0
-access_account_journal_aggregator_group_user,account.journal.aggregator.group.user,model_account_journal_aggregator,base.group_user,1,1,1,0
