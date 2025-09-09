@@ -4,3 +4,6 @@ access_payment_aggregator_group_user,payment.aggregator.group.admin,model_mps_pa
 access_mps_payment_methods_line_group_user,mps.payment.methods.line.group.admin,model_mps_payment_methods_line,base.group_user,1,1,1,0
 access_account_move_line_payment_aggregator_group_user,account.move.line.payment.aggregator.group.admin,model_account_move_line_payment_aggregator,base.group_user,1,1,1,0
 access_account_journal_aggregator_group_user,account.journal.aggregator.group.user,model_account_journal_aggregator,base.group_user,1,1,1,0
+access_mps_payment_aggregator_wizard_group_user,mps.payment.aggregator.wizard.group.user,model_mps_payment_aggregator_wizard,base.group_user,1,1,1,0
+access_mps_payment_aggregator_add_invoices_wizard_group_user,mps.payment.aggregator.add.invoices.wizard.group.user,model_mps_payment_aggregator_add_invoices_wizard,base.group_user,1,1,1,0
+access_mps_payment_aggregator_invoice_selector_wizard_group_user,mps.payment.aggregator.invoice.selector.wizard.group.user,model_mps_payment_aggregator_invoice_selector_wizard,base.group_user,1,1,1,0

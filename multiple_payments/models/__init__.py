@@ -6,3 +6,8 @@ from . import account_move_line
 from . import account_payment
 from . import account_move_line_payment_aggregator
 from . import account_journal_aggregator
+from . import payment_aggregator_wizard
+from . import account_move
+from . import payment_aggregator_add_invoices_wizard
+from . import account_move_aggregator
+from . import payment_aggregator_invoice_selector_wizard

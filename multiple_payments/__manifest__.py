@@ -23,6 +23,9 @@
         "views/payment_view.xml",
         "views/account_journal_aggregator_views.xml",
         "views/account_payment_views.xml",
+        "views/payment_aggregator_wizard_views.xml",
+        "views/payment_aggregator_add_invoices_wizard_views.xml",
+        "views/payment_aggregator_invoice_selector_wizard_views.xml",
         "views/ir_menu_views.xml",
         # Reports
     ],

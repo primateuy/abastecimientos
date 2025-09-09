@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Wizard Form View -->
+    <record id="view_mps_payment_aggregator_add_invoices_wizard_form" model="ir.ui.view">
+        <field name="name">mps.payment.aggregator.add.invoices.wizard.form</field>
+        <field name="model">mps.payment.aggregator.add.invoices.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Agregar facturas al agrupador">
+                <group>
+                    <field name="payment_aggregator_id" readonly="1"/>
+                    <field name="partner_id" readonly="1"/>
+                    <field name="currency_id" readonly="1"/>
+                    <field name="partner_type" readonly="1"/>
+                    <field name="move_types" invisible="1"/>
+                </group>
+                <group>
+<!--                    <field name="move_ids" nolabel="1" widget="many2many_checkboxes"/>-->
+                </group>
+                <footer>
+                    <button name="action_search_invoices" type="object" string="Buscar Facturas" class="btn-info"/>
+                    <button name="action_add_invoices" type="object" string="Agregar Facturas Seleccionadas" class="btn-primary"/>
+<!--                    <button name="action_debug" type="object" string="Debug" class="btn-info"/>-->
+                    <button string="Cancelar" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- List View for Available Invoices -->
+    <record id="view_mps_payment_aggregator_invoices_list" model="ir.ui.view">
+        <field name="name">mps.payment.aggregator.invoices.list</field>
+        <field name="model">account.move</field>
+        <field name="arch" type="xml">
+            <tree string="Facturas Disponibles" multi_edit="1" create="false" edit="false">
+                <field name="name" string="Número"/>
+                <field name="company_id" invisible="1"/>
+                <field name="partner_id" string="Cliente/Proveedor"/>
+                <field name="amount_total" string="Total"/>
+                <field name="currency_id" string="Moneda"/>
+                <field name="invoice_date" string="Fecha"/>
+                <field name="state" string="Estado"/>
+                <button name="action_add_to_aggregator" type="object" string="Agregar al Agrupador" class="btn-primary" icon="fa-plus"/>
+            </tree>
+        </field>
+    </record>
+
+    <!-- Checkbox List View for Available Invoices -->
+    <record id="view_mps_payment_aggregator_invoices_checkbox_list" model="ir.ui.view">
+        <field name="name">mps.payment.aggregator.invoices.checkbox.list</field>
+        <field name="model">account.move</field>
+        <field name="arch" type="xml">
+            <tree string="Facturas Disponibles" create="false" edit="false" delete="false">
+                <field name="name" string="Número"/>
+                <field name="company_id" invisible="1"/>
+                <field name="partner_id" string="Cliente/Proveedor"/>
+                <field name="amount_total" string="Total"/>
+                <field name="currency_id" string="Moneda"/>
+                <field name="invoice_date" string="Fecha"/>
+                <field name="state" string="Estado"/>
+            </tree>
+        </field>
+    </record>
+
+    <!-- Action to open the wizard -->
+    <record id="action_open_mps_payment_aggregator_add_invoices_wizard" model="ir.actions.act_window">
+        <field name="name">Agregar facturas al agrupador</field>
+        <field name="res_model">mps.payment.aggregator.add.invoices.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="view_mps_payment_aggregator_add_invoices_wizard_form"/>
+        <field name="target">new</field>
+        <field name="context">{'active_id': active_id}</field>
+    </record>
+
+    <!-- Action to open available invoices list -->
+    <record id="action_open_mps_payment_aggregator_invoices_list" model="ir.actions.act_window">
+        <field name="name">Facturas Disponibles</field>
+        <field name="res_model">account.move</field>
+        <field name="view_mode">tree,form</field>
+        <field name="view_id" ref="view_mps_payment_aggregator_invoices_list"/>
+        <field name="target">current</field>
+        <field name="context">{'search_default_available_invoices': 1, 'create': False, 'edit': False}</field>
+    </record>
+
+    <!-- Server Action for Multiple Selection -->
+    <record id="action_add_multiple_to_aggregator" model="ir.actions.server">
+        <field name="name">Agregar al Agrupador</field>
+        <field name="model_id" ref="account.model_account_move"/>
+        <field name="binding_model_id" ref="account.model_account_move"/>
+        <field name="state">code</field>
+        <field name="code">
+if records:
+    # Obtener el wizard_id del contexto
+    wizard_id = env.context.get('wizard_id')
+    if wizard_id:
+        wizard = env['mps.payment.aggregator.add.invoices.wizard'].browse(wizard_id)
+        if wizard.exists():
+            result = wizard.action_add_selected_invoices(records.ids)
+            if result:
+                action = result
+        </field>
+    </record>
+
+    <!-- Action to open checkbox list with selection -->
+    <record id="action_open_mps_payment_aggregator_invoices_checkbox_list" model="ir.actions.act_window">
+        <field name="name">Seleccionar Facturas</field>
+        <field name="res_model">account.move</field>
+        <field name="view_mode">tree</field>
+        <field name="view_id" ref="view_mps_payment_aggregator_invoices_checkbox_list"/>
+        <field name="target">current</field>
+        <field name="context">{'create': False, 'edit': False, 'delete': False}</field>
+    </record>
+
+</odoo>

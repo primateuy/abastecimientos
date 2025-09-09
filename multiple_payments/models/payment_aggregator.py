@@ -1243,7 +1243,7 @@ class PaymentAggregator(models.Model):
             for credit_line, agg_line in zip(record.mps_credits_line_ids, record.account_move_line_payment_agg_ids):
                 credit_line.total_import = agg_line.payment_aggregator_total_import
    
-    @api.onchange('customer_id', 'currency_id')
+    @api.onchange('customer_id', 'currency_id', 'receiptbook_id')
     def filter_credit_moves(self):
         """
         Filtra las líneas contables cuando cambia el cliente o la moneda.
@@ -1252,7 +1252,7 @@ class PaymentAggregator(models.Model):
         y moneda seleccionados, y crea registros temporales para mostrar en la vista.
         """
         # Buscar líneas contables pendientes
-        credit_lines = self.search_account_move_line()
+        credit_lines = self.search_account_move_line() or []
         _logger.info(f"Líneas contables encontradas: {len(credit_lines)} para cliente {self.customer_id} y moneda {self.currency_id}")
         
         # Asignar las líneas encontradas
@@ -1297,17 +1297,82 @@ class PaymentAggregator(models.Model):
                 self.account_journal_aggregator_id = intermediate_diary.id
 
     def assign_domain(self, payment_state='not_paid'):
+        """
+        Genera el dominio para buscar líneas de crédito según el tipo del talonario.
+        """
+        # Determinar tipos de factura según el partner_type del talonario
+        if self.receiptbook_id and self.receiptbook_id.partner_type == 'customer':
+            move_types = ['out_invoice', 'out_refund']
+        elif self.receiptbook_id and self.receiptbook_id.partner_type == 'supplier':
+            move_types = ['in_invoice', 'in_refund']
+        else:
+            # Fallback si no hay talonario configurado
+            move_types = ['out_invoice', 'out_refund', 'in_invoice', 'in_refund']
+        
         return [
             ('partner_id', '=', self.customer_id.id),
             ('currency_id', '=', self.currency_id.id),
             ('account_id.account_type', 'in', ['asset_receivable', 'liability_payable']),
-            ('move_id.move_type', 'in', ['out_invoice','in_invoice']),
-            ('move_id.state','=','posted')
+            ('move_id.move_type', 'in', move_types),
+            ('move_id.state', '=', 'posted')
         ]
    
     def search_account_move_line(self):
-        return self.env['account.move.line'].search(self.assign_domain())
-   
+        if self.customer_id and self.currency_id and self.receiptbook_id:
+            domain = self.assign_domain()
+            credit_lines = self.env['account.move.line'].search(domain)
+            _logger.info(f"Líneas de crédito encontradas: {len(credit_lines)}")
+
+            # 2. Filtrar por cuentas del diario del talonario (solo si están configuradas)
+            journal_accounts = self._get_journal_accounts(self)
+            if journal_accounts:
+                credit_lines = credit_lines.filtered(lambda l: l.account_id.id in journal_accounts)
+                _logger.info(f"Líneas después de filtrar por cuentas del diario: {len(credit_lines)}")
+            else:
+                _logger.info("No se aplicará filtro por cuentas del diario - usando todas las líneas de crédito")
+            return credit_lines
+
+    def _get_journal_accounts(self, aggregator):
+        """
+        Obtiene las cuentas configuradas en el diario del talonario para la moneda.
+
+        Args:
+            aggregator: Recordset del agrupador de pagos
+
+        Returns:
+            Lista de IDs de cuentas
+        """
+        journal_accounts = []
+
+        if aggregator.receiptbook_id and aggregator.receiptbook_id.account_journal_id:
+            journal = self.receiptbook_id.account_journal_id
+            _logger.info(f"Diario del talonario: {journal.name}")
+
+            # Buscar cuentas de la moneda en el diario
+            if hasattr(journal, 'account_currency_ids'):
+                currency_accounts = journal.account_currency_ids.filtered(
+                    lambda acc: acc.currency_id == aggregator.currency_id
+                )
+                journal_accounts = currency_accounts.ids
+                _logger.info(f"Cuentas de moneda en diario: {[acc.display_name for acc in currency_accounts]}")
+            else:
+                # Si no hay account_currency_ids, usar las cuentas por defecto del diario
+                if self.receiptbook_id.partner_type == 'customer':
+                    journal_accounts = [journal.default_account_id.id] if journal.default_account_id else []
+                else:
+                    journal_accounts = [journal.default_account_id.id] if journal.default_account_id else []
+                _logger.info(
+                    f"Cuenta por defecto del diario: {journal.default_account_id.display_name if journal.default_account_id else 'Ninguna'}")
+
+        _logger.info(f"IDs de cuentas para filtrar: {journal_accounts}")
+
+        # Si no se encontraron cuentas específicas del diario, no aplicar filtro por cuentas
+        if not journal_accounts:
+            _logger.info("No se encontraron cuentas del diario, no se aplicará filtro por cuentas")
+            return []
+
+        return journal_accounts
+
     def set_account_move_line(self, credit_lines=False):
         """
         Crea registros de agregador de pago para las líneas contables seleccionadas.
@@ -1446,7 +1511,7 @@ class PaymentAggregator(models.Model):
                         # Buscar la línea contable correspondiente usando el índice
                         if result.customer_id and result.currency_id:
                             # Limitar la búsqueda al mismo tope de 80 para mantener correspondencia
-                            credit_lines = result.search_account_move_line()[:80]
+                            credit_lines = result.search_account_move_line() or []
                             if i < len(credit_lines):
                                 credit_line = credit_lines[i]
                                 # Crear registro con el importe editado por el usuario
@@ -3257,17 +3322,17 @@ class PaymentAggregator(models.Model):
 
     def button_add_invoices(self):
         """
-        Abre el wizard para agregar facturas al agrupador actual.
+        Abre el wizard para seleccionar y agregar facturas al agrupador actual.
         
         Returns:
-            dict: Acción para abrir el wizard
+            dict: Acción para abrir el wizard de selección de facturas
         """
         self.ensure_one()
         
         action = {
-            'name': 'Agregar facturas al agrupador',
+            'name': 'Seleccionar Facturas para el Agrupador',
             'type': 'ir.actions.act_window',
-            'res_model': 'mps.payment.aggregator.add.invoices.wizard',
+            'res_model': 'mps.payment.aggregator.invoice.selector.wizard',
             'view_mode': 'form',
             'target': 'new',
             'context': {

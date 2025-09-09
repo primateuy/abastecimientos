@@ -117,6 +117,14 @@
                                     class="oe_highlight fa m-1" 
                                     invisible="state == 'draft'"
                                 />
+                                <button
+                                    name="button_add_invoices"
+                                    type="object"
+                                    string="Agregar Facturas"
+                                    class="oe_highlight fa m-1"
+                                    icon="fa-plus"
+                                    invisible="state == 'published'"
+                                />
                                 <button 
                                     name="button_open_accounting_notes" 
                                     type="object"

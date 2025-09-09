@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Wizard Form View -->
+    <record id="view_mps_payment_aggregator_wizard_form" model="ir.ui.view">
+        <field name="name">mps.payment.aggregator.wizard.form</field>
+        <field name="model">mps.payment.aggregator.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Crear agregadores de pagos">
+                <group>
+                    <field name="partner_type" required="1"/>
+                    <field name="receipt_type" required="1"/>
+                    <field name="receiptbook_id" required="1"/>
+                    <field name="date" required="1"/>
+                </group>
+                <group>
+                    <field name="move_ids" widget="many2many_tags" domain="[('move_type', 'in', ['out_invoice','out_refund','in_invoice','in_refund'])]"/>
+                </group>
+                <footer>
+                    <button name="action_create_aggregators" type="object" string="Crear" class="btn-primary"/>
+                    <button string="Cancelar" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- Smart action from invoice trees -->
+    <record id="action_open_mps_payment_aggregator_wizard" model="ir.actions.act_window">
+        <field name="name">Crear agregadores de pago</field>
+        <field name="res_model">mps.payment.aggregator.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="view_mps_payment_aggregator_wizard_form"/>
+        <field name="target">new</field>
+        <field name="context">{"default_move_ids": active_ids}</field>
+    </record>
+
+    <!-- Server action for creating payment aggregators -->
+    <record id="action_server_create_payment_aggregators" model="ir.actions.server">
+        <field name="name">Crear agregadores de pago</field>
+        <field name="model_id" ref="account.model_account_move"/>
+        <field name="binding_model_id" ref="account.model_account_move"/>
+        <field name="state">code</field>
+        <field name="code">
+# Llamar al método del modelo account.move
+action = records.action_create_payment_aggregators()
+        </field>
+    </record>
+
+</odoo>
+
+
