@@ -1,2 +1,0 @@
-
-16.0.20250826223655 - guard call to set_transaction_type; internal transfer fixes; stub buttons/methods.

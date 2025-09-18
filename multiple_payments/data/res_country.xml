@@ -1,6 +1,0 @@
-<odoo>
-    <record id="base.uy" model="res.country">
-        <field name="name">Uruguay</field>
-        <field name="code">UY</field>
-    </record>
-</odoo>
