@@ -9,7 +9,7 @@
     ],
     "assets": {
         "web.assets_backend": [
-            "ml_sum_amount_currency/static/src/js/aml_totals_patch.js",
+            "suma_amount_currency/static/src/js/aml_totals_patch.js",
         ],
     },
     "installable": True,
