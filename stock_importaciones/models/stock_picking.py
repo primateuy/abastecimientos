@@ -19,7 +19,6 @@ class StockPicking(models.Model):
         return result
 
     import_op_status = fields.Selection(selection=[("open", "Abierta"), ("closed", "Cerrada")],
-                                        default='open',
                                         string="Estado de la Carpeta")
 
     def action_toggle_import_status(self):
