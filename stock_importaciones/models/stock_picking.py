@@ -19,10 +19,12 @@ class StockPicking(models.Model):
         return result
 
     import_op_status = fields.Selection(selection=[("open", "Abierta"), ("closed", "Cerrada")],
+                                        default='open',
                                         string="Estado de la Carpeta")
 
     def action_toggle_import_status(self):
         self.ensure_one()
+        text = ""
         if (self.import_op_status == 'open'):
             self.import_op_status = 'closed'
             text = "Transferencia cerrada correctamente."
