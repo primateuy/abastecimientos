@@ -1,31 +1,38 @@
-from odoo import api, fields, models
+from odoo import api, models, _, UserError
 
 class AccountMove(models.Model):
     _inherit = "account.move"
 
-    # Campo "sombra" para importación. Solo para el wizard de import.
-    import_l10n_ar_currency_rate = fields.Float(
-        string="(Import) AR Currency Rate",
-        help="Usar este campo solo al importar. Se copiará a l10n_ar_currency_rate.",
-        digits="Product Price",
-    )
+    def fields_get(self, allfields=None, attributes=None):
+        res = super().fields_get(allfields=allfields, attributes=attributes)
+        fld = res.get("l10n_ar_currency_rate")
+        if fld:
+            # forzar que aparezca en el asistente de importación
+            fld["importable"] = True
+            # y asegurarnos que el wizard no lo esconda por readonly
+            fld["readonly"] = False
+        return res
 
     @api.model_create_multi
     def create(self, vals_list):
-        # Copiamos el valor importado al campo real si viene en el CSV/XLS
+        # Bloquear seteo de invoice_date si el diario usa CFE
         for vals in vals_list:
-            if "import_l10n_ar_currency_rate" in vals:
-                rate = vals.pop("import_l10n_ar_currency_rate")
-                # Si tu campo real está en este modelo:
-                if rate not in (False, None):
-                    vals["l10n_ar_currency_rate"] = rate
-        moves = super().create(vals_list)
-        return moves
+            if "l10n_ar_currency_rate" in vals:
+                journal_id = vals.get("journal_id") or self.env.context.get("default_journal_id")
+                if journal_id:
+                    jr = self.env["account.journal"].browse(journal_id)
+                    try:
+                        if getattr(jr, "diario_cfe", False):
+                            raise UserError(_("No se puede establecer la Fecha de factura cuando el diario utiliza CFE."))
+                    except Exception:
+                        # si el campo no existe no bloqueamos
+                        pass
+        return super().create(vals_list)
 
     def write(self, vals):
-        # Soporta importaciones que usen "Actualizar registros existentes"
-        if "import_l10n_ar_currency_rate" in vals:
-            rate = vals.pop("import_l10n_ar_currency_rate")
-            if rate not in (False, None):
-                vals["l10n_ar_currency_rate"] = rate
+        # Bloquear modificación si el diario usa CFE
+        if "l10n_ar_currency_rate" in vals:
+            with_cfe = self.filtered(lambda m: getattr(m.journal_id, "diario_cfe", False))
+            if with_cfe:
+                raise UserError(_("No se puede modificar la Fecha de factura en diarios con CFE."))
         return super().write(vals)
