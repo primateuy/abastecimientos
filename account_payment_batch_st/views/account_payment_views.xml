@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- VIEWS -->
+
+        <record id="view_account_payment_search_inherit_account_batch_payment" model="ir.ui.view">
+            <field name="name">account.payment.search.inherit.account_batch_payment_st</field>
+            <field name="model">account.payment</field>
+            <field name="inherit_id" ref="account.view_account_payment_search" />
+            <field name="arch" type="xml">
+
+                <!-- Filter on batch payments -->
+                <filter name="transfers_filter" position="after">
+                    <separator/>
+                    <filter string="Incluido en Lote"
+                            name="batch_payments_st_filter"
+                            domain="[('batch_payment_st_id', '!=', False)]"/>
+                    <filter string="No incluido en Lote"
+                            name="batch_payments_st_filter"
+                            domain="[('batch_payment_st_id', '=', False)]"/>
+                    <separator/>
+                </filter>
+                <!-- Group by batch payments -->
+                <filter name="paymentmethodline" position="after">
+                    <filter string="Lote"
+                            name="batch_payments_st"
+                            context="{'group_by': 'batch_payment_st_id'}"/>
+                </filter>
+
+                <!-- <filter name="reconciled" position="after">
+                    <filter string="Not reconciled" name="not_reconciled" domain="[('is_reconciled', '=', False)]"/>
+                </filter> -->
+
+            </field>
+        </record>
+
+        <record id="view_account_payment_tree_inherit_account_batch_payment" model="ir.ui.view">
+            <field name="name">account.payment.tree.inherit.account_batch_payment_st</field>
+            <field name="model">account.payment</field>
+            <field name="inherit_id" ref="account.view_account_payment_tree" />
+            <field name="arch" type="xml">
+                <field name="partner_id" position="after">
+                    <field name="batch_payment_st_id" />
+                </field>
+                <field name="partner_id" position="replace">
+                    <field name="partner_id" string="Partner"/>
+                </field>
+            </field>
+        </record>
+
+        <record id="view_account_payment_form_inherit_account_batch_payment" model="ir.ui.view">
+            <field name="name">account.payment.form.inherit.account_batch_payment_st</field>
+            <field name="model">account.payment</field>
+            <field name="inherit_id" ref="account.view_account_payment_form" />
+            <field name="arch" type="xml">
+
+                <div name="button_box" position="inside">
+                    <!-- Batch payment stat button -->
+                    <button name="button_open_batch_payment_st" type="object"
+                            class="oe_stat_button" icon="fa-bars"
+                            invisible="not batch_payment_st_id">
+                        <span>Lote de pago</span>
+                    </button>
+                </div>
+
+                <xpath expr="//field[@name='ref']" position="after">
+                    <field name="batch_payment_st_id"/>
+                </xpath>
+
+            </field>
+        </record>
+
+        <record id="view_account_payment_tree_popup_inherit_account_batch_payment" model="ir.ui.view">
+            <field name="name">account.payment.tree.popup.inherit.account_batch_payment_st</field>
+            <field name="model">account.payment</field>
+            <field name="inherit_id" ref="account.view_account_payment_tree"/>
+            <field name="mode">primary</field>
+            <field name="priority">10</field>
+            <field name="arch" type="xml">
+                <xpath expr="//field[@name='batch_payment_st_id']" position="attributes">
+                    <attribute name="optional">hide</attribute>
+                </xpath>
+            </field>
+        </record>
+
+    </data>
+</odoo>

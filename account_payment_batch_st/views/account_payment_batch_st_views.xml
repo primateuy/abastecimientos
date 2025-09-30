@@ -1,0 +1,188 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+<data>
+      
+        <record id="view_batch_payment_form" model="ir.ui.view">
+            <field name="name">account.payment.batch.st.form</field>
+            <field name="model">account.payment.batch.st</field>
+            <field name="arch" type="xml">
+                <form string="Batch Payment">
+                <header>
+                    <button name="action_draft" string="Restablecer a borrador" type="object" class="btn btn-secondary" groups="account.group_account_invoice" data-hotkey="w"/>
+                    <button name="action_cancel" string="Cancelar" type="object" invisible="not id or state != 'draft'" data-hotkey="x"/>
+                    <field name="id" invisible="1"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,posted"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="name" placeholder="Leave empty to generate automatically..." required="0" readonly="state != 'draft'"/>
+                            <field name="partner_id" />
+                            <field name="batch_type" invisible="1"/>
+                            <field name="currency_id"/>
+                            <field name="company_id"/>
+                          
+                        </group><group>
+                            <field name="date" readonly="state != 'draft'"/>
+
+                        </group>
+                    </group>
+
+                    <notebook>
+                        <page string="Pagos" name="payments">
+                            <field name="payment_ids"
+                                   readonly="state != 'draft'"
+                                   force_save="1"
+                                   widget="many2many"
+                                   domain="[('batch_payment_st_id', '=', False), ('state', '=', 'posted'), ('is_move_sent', '=', False), ('payment_type','=',batch_type), ('amount', '!=', 0)]"
+                                   options="{'no_create': True}">
+                                <tree string="Pagos" decoration-muted="state == 'draft'" create="false">
+                                    <field name="name" optional="show"/>
+                                    <field name="journal_id" optional="show"/>
+                                    <field name="payment_method_line_id" optional="show" />
+                                    <field name="amount" sum="Total" string="Importe" optional="show"/>
+                                    <field name="currency_id" optional="show"/>
+                                    <field name="ref" optional="show"/>
+                                    <field name="withholdings_amount" optional="show"/>
+                                    <field name="payment_total" optional="show"/>
+                                    <field name="state" optional="show"/>
+                                </tree>
+                            </field>
+                            <button name="add_payment" type="object" string="Add new payment" class="oe_link"/>
+                        </page>
+                        <page string="Pagado" name="move_lines">
+                            <field name="matched_move_line_ids" >
+                                <tree string="Pagado">
+                                    <field name="date" readonly="True" optional="show"/>
+                                    <field name="date_maturity" optional="hide" readonly="True"/>
+                                    <field name="move_id" required="0" readonly="True" optional="show"/>
+                                    <field name="journal_id" options='{"no_open":True}' readonly="True" optional="hide"/>
+                                    <field name="name" readonly="True" optional="hide"/>
+                                    <field name="ref" optional="show" readonly="True"/>
+                                    <field name="statement_id" column_invisible="True" readonly="True"/>
+                                    <field name="account_id" options='{"no_open":True}' domain="[('company_id', '=', company_id)]" readonly="True" optional="hide"/>
+                                    <field name="balance" optional="hide" readonly="True" string="Importe"/>
+
+                                
+                                    <field name="amount_residual" readonly="True" optional="show"/>
+                                    <field name="amount_currency" groups="base.group_multi_currency" readonly="True" optional="show"/>
+                                    <field name="amount_residual_currency" optional="hide" groups="base.group_multi_currency" readonly="True"/>
+                                    <field name="currency_id" column_invisible="True" readonly="True"/>
+                                    <field name="company_currency_id" column_invisible="True" readonly="True"/>
+                                    <field name="company_id" column_invisible="True" readonly="True"/>
+                                </tree>
+                            </field>
+                        </page>
+                        <page string="Retenciones" name="retenciones">
+                            <field name="l10n_ar_withholding_ids" nolabel="1" colspan="2"
+                                readonly="True" >
+                                <tree>
+                                    <field name="move_name" column_invisible="True"/>
+                                    <field name="tax_line_id" string="Tax"/>
+                                    <field name="name" string="Withholding Number" required="1"/>
+                                    <field name="amount_currency" readonly="0" required="1" string="Amount" sum="Total"/>
+                                </tree>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+                <div class="oe_chatter">
+                    <field name="message_follower_ids" groups="base.group_user"/>
+                    <field name="activity_ids"/>
+                    <field name="message_ids"/>
+                </div>
+                </form>
+            </field>
+        </record>
+
+      
+        <record id="view_batch_payment_tree" model="ir.ui.view">
+            <field name="name">account.payment.batch.st.tree</field>
+            <field name="model">account.payment.batch.st</field>
+            <field name="arch" type="xml">
+                <tree>
+                    <field name="date" readonly="state != 'draft'" optional="show"/>
+                    <field name="name" readonly="state != 'draft'" optional="show"/>
+                    <field name="partner_id" optional="show"/>
+                    <field name="amount" optional="show"/>
+                    <field name="state" optional="show"/>
+                    <field name="activity_ids" widget="list_activity" optional="show" string="Actividades"/>
+                    <field name="currency_id" column_invisible="True"/>
+                </tree>
+            </field>
+        </record>
+
+        <record id="action_batch_payment_in" model="ir.actions.act_window">
+            <field name="name">Recibos de Cliente</field>
+            <field name="res_model">account.payment.batch.st</field>
+            <field name="view_mode">tree,form,kanban,activity</field>
+            <field name="view_id" ref="view_batch_payment_tree"/>
+        
+            <field name="domain" eval="[('batch_type', '=', 'inbound')]"/>
+            <field name="context">{'search_default_open': 1, 'default_batch_type': 'inbound'}</field>
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">
+                </p>
+            </field>
+        </record>
+
+        <record id="action_batch_payment_out" model="ir.actions.act_window">
+            <field name="name">Pagos de Proveedor</field>
+            <field name="res_model">account.payment.batch.st</field>
+            <field name="view_mode">tree,form,kanban,activity</field>
+            <field name="view_id" ref="view_batch_payment_tree"/>
+         
+            <field name="domain" eval="[('batch_type', '=', 'outbound')]"/>
+            <field name="context">{'search_default_open': 1, 'default_batch_type': 'outbound'}</field>
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">
+
+                </p>
+            </field>
+        </record>
+
+         <record id="view_account_move_kanban" model="ir.ui.view">
+            <field name="name">account.payment.batch.st.move.kanban</field>
+            <field name="model">account.payment.batch.st</field>
+            <field name="arch" type="xml">
+                <kanban class="o_kanban_mobile" sample="1" js_class="account_documents_kanban">
+                    <field name="name"/>
+                    <field name="date"/>
+                    <field name="state"/>
+                    <templates>
+                        <t t-name="kanban-box">
+                            <div t-attf-class="oe_kanban_global_click">
+                                <div class="row mb4">
+                                    <div class="col-6 o_kanban_record_headings">
+                                        <strong class="o_kanban_record_title">
+                                            <span>
+                                                <field name="name" readonly="state != 'draft'"/>
+                                            </span>
+                                        </strong>
+                                    </div>
+                                    <div class="col-6 text-end">
+                                        <strong><i class="fa fa-clock-o" aria-label="Date" role="img" title="Date"/> <t t-out="record.date.value"/></strong>
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-6">
+                                        <span><field name="amount" widget='monetary'/></span>
+                                        <span><field name="currency_id" invisible="1"/></span>
+                                    </div>
+                                    <div class="col-6">
+                                        <span class="float-end">
+                                            <field name="state" widget="label_selection" options="{'classes': {'new': 'default', 'sent': 'default', 'reconciled': 'success'}}"/>
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </t>
+                    </templates>
+                </kanban>
+            </field>
+        </record>
+
+        <menuitem action="action_batch_payment_in" name="Recibos de Cliente" id="menu_batch_payment_st_sales" parent="account.menu_finance_receivables" sequence="300" groups="account.group_account_readonly"/>
+        <menuitem action="action_batch_payment_out" name="Pagos de Proveedor" id="menu_batch_payment_st_purchases" parent="account.menu_finance_payables" sequence="300" groups="account.group_account_readonly"/>
+ </data>
+</odoo>
