@@ -16,7 +16,7 @@
 
                 <button name="action_toggle_import_status"
                         confirm='Va a cerrar la Transferencia. Esta ya no estará disponible para Costes en Destino. Desea continuar?'
-                        invisible="state == 'draft' or is_import_op == False or import_op_status == 'closed' or import_op_status == ''"
+                        invisible="state == 'draft' or is_import_op == False or import_op_status == 'closed'"
                         string="Cerrar" class="oe_highlight"
                         groups="stock_importaciones.open_close_imports"
                         type="object"
@@ -24,6 +24,7 @@
 
             </xpath>
             <xpath expr="//field[@name='location_dest_id']" position="after">
+                <field name="is_import_op" invisible="1"/>
                 <field name="import_op_status" string="Estado de la Carpeta" invisible="is_import_op == False" readonly="1"/>
             </xpath>
             <xpath expr="//div[@name='button_box']" position="inside">
