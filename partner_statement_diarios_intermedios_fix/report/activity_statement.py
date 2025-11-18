@@ -12,18 +12,20 @@ class ActivityStatement(models.AbstractModel):
     def _get_excluded_journal_ids(self):
         """
         Construye la lista de diarios a excluir:
-        - Diario de diferencias de cambio (company.currency_exchange_journal_id)
+        - Diario de diferencias de cambio
         - Diarios intermedios pasados por contexto: context['excluded_journal_ids']
           (acepta lista/tupla/set o string CSV)
         - (Opcional) company.intermediate_journal_ids si existe en tu base
         """
-        company = self.env.company
         ids_set = set()
 
-        # 1) Diario de diferencias de cambio (lo que ya excluye tu fix):contentReference[oaicite:3]{index=3}
-        if getattr(company, "currency_exchange_journal_id", False):
-            if company.currency_exchange_journal_id:
-                ids_set.add(company.currency_exchange_journal_id.id)
+        # 1) Diario de diferencias de cambio
+        companies = self.env['res.company'].sudo().search([])
+        for comp in companies:
+            if getattr(comp, "currency_exchange_journal_id", False):
+                journal = comp.currency_exchange_journal_id
+                if journal:
+                    ids_set.add(journal.id)
 
         # 2) Por contexto (ej: {'excluded_journal_ids': [1,2,3]})
         ctx_val = self.env.context.get("excluded_journal_ids")
@@ -37,6 +39,7 @@ class ActivityStatement(models.AbstractModel):
                     if part.isdigit():
                         ids_set.add(int(part))
 
+        # 3) Diarios interemedios
         Journal = self.env["account.journal"]
         if "intermediate_diary" in Journal._fields:
             interm_journals = Journal.search([
@@ -45,20 +48,7 @@ class ActivityStatement(models.AbstractModel):
             ids_set.update(interm_journals.ids)
 
         # Evita tuplas vacías en SQL
-        return tuple(ids_set) or (0,) 
-
-
-
-    def _get_exchange_defalts(self):
-        company = self.env.company
-
-        res = {
-            "journal_id": company.currency_exchange_journal_id.id,
-            "income_account_id": company.income_currency_exchange_account_id.id,
-            "expense_account_id": company.expense_currency_exchange_account_id.id,
-        }
-
-        return res
+        return tuple(ids_set) or (0,)
 
 
     def _initial_balance_sql_q1(self, partners, date_start, account_type):
@@ -110,58 +100,10 @@ class ActivityStatement(models.AbstractModel):
             "utf-8",
         )
 
-    def _initial_balance_sql_q2(self, sub):
-        return str(
-            self._cr.mogrify(
-                f"""
-            SELECT {sub}.partner_id, {sub}.currency_id,
-                sum(CASE WHEN {sub}.currency_id is not null
-                    THEN {sub}.open_amount_currency
-                    ELSE {sub}.open_amount
-                END) as balance, {sub}.company_id
-            FROM {sub}
-            GROUP BY {sub}.partner_id, {sub}.currency_id, {sub}.company_id""",
-                locals(),
-            ),
-            "utf-8",
-        )
 
-    def _initial_balance_sql_q3(self, sub, company_id):
-        return str(
-            self._cr.mogrify(
-                f"""
-            SELECT {sub}.partner_id, {sub}.balance,
-                COALESCE({sub}.currency_id, c.currency_id) AS currency_id
-            FROM {sub}
-            JOIN res_company c ON (c.id = {sub}.company_id)
-            WHERE c.id = %(company_id)s""",
-                locals(),
-            ),
-            "utf-8",
-        )
 
-    def _get_account_initial_balance(
-        self, company_id, partner_ids, date_start, account_type
-    ):
-        balance_start = defaultdict(list)
-        partners = tuple(partner_ids)
-        # pylint: disable=E8103
-        self.env.cr.execute(
-            """WITH Q1 AS (%s),
-                    Q2 AS (%s),
-                    Q3 AS (%s)
-        SELECT partner_id, currency_id, sum(balance) as balance
-        FROM Q3
-        GROUP BY partner_id, currency_id"""
-            % (
-                self._initial_balance_sql_q1(partners, date_start, account_type),
-                self._initial_balance_sql_q2("Q1"),
-                self._initial_balance_sql_q3("Q2", company_id),
-            )
-        )
-        for row in self.env.cr.dictfetchall():
-            balance_start[row.pop("partner_id")].append(row)
-        return balance_start
+
+
 
     def _display_activity_lines_sql_q1(
         self, partners, date_start, date_end, account_type
@@ -237,44 +179,6 @@ class ActivityStatement(models.AbstractModel):
             "utf-8",
         )
 
-    def _get_account_display_lines(
-        self, company_id, partner_ids, date_start, date_end, account_type
-    ):
-        res = dict(map(lambda x: (x, []), partner_ids))
-        partners = tuple(partner_ids)
-
-        # pylint: disable=E8103
-        self.env.cr.execute(
-            """
-        WITH Q1 AS (%s),
-             Q2 AS (%s)
-        SELECT partner_id, move_id, date, date_maturity, ids,
-            COALESCE(name, '') as name, COALESCE(ref, '') as ref,
-            debit, credit, amount, blocked, currency_id
-        FROM Q2
-        ORDER BY date, date_maturity, move_id"""
-            % (
-                self._display_activity_lines_sql_q1(
-                    partners, date_start, date_end, account_type
-                ),
-                self._display_activity_lines_sql_q2("Q1", company_id),
-            )
-        )
-        for row in self.env.cr.dictfetchall():
-            res[row.pop("partner_id")].append(row)
-        return res
-
-    def _display_activity_reconciled_lines_sql_q1(self, sub):
-        return str(
-            self._cr.mogrify(
-                f"""
-            SELECT unnest(ids) as id
-            FROM {sub}
-        """,
-                locals(),
-            ),
-            "utf-8",
-        )
 
     def _display_activity_reconciled_lines_sql_q2(self, sub, date_end):
         journal_id = self.env.company.currency_exchange_journal_id.id
@@ -329,40 +233,3 @@ class ActivityStatement(models.AbstractModel):
             ),
             "utf-8",
         )
-
-    def _get_account_display_reconciled_lines(
-        self, company_id, partner_ids, date_start, date_end, account_type
-    ):
-        partners = tuple(partner_ids)
-
-        # pylint: disable=E8103
-        self.env.cr.execute(
-            """
-        WITH Q1 AS (%s),
-             Q2 AS (%s),
-             Q3 AS (%s),
-             Q4 AS (%s),
-             Q5 AS (%s),
-             Q6 AS (%s)
-        SELECT partner_id, currency_id, move_id, date, date_maturity, debit,
-               credit, amount, open_amount, COALESCE(name, '') as name,
-               COALESCE(ref, '') as ref, blocked, id
-        FROM Q6
-        ORDER BY date, date_maturity, move_id"""
-            % (
-                self._display_activity_lines_sql_q1(
-                    partners, date_start, date_end, account_type
-                ),
-                self._display_activity_lines_sql_q2("Q1", company_id),
-                self._display_activity_reconciled_lines_sql_q1("Q2"),
-                self._display_activity_reconciled_lines_sql_q2("Q3", date_end),
-                self._display_outstanding_lines_sql_q2("Q4"),
-                self._display_outstanding_lines_sql_q3("Q5", company_id),
-            )
-        )
-        return self.env.cr.dictfetchall()
-
-    @api.model
-    def _get_report_values(self, docids, data=None):
-        default = self._get_exchange_defalts()
-        return super()._get_report_values(docids, data)
