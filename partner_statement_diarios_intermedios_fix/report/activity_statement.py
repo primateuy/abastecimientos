@@ -41,7 +41,6 @@ class ActivityStatement(models.AbstractModel):
         if "intermediate_diary" in Journal._fields:
             interm_journals = Journal.search([
                 ("intermediate_diary", "=", True),
-                ("company_id", "=", company.id),
             ])
             ids_set.update(interm_journals.ids)
 
