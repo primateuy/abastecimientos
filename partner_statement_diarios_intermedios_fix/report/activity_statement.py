@@ -37,13 +37,13 @@ class ActivityStatement(models.AbstractModel):
                     if part.isdigit():
                         ids_set.add(int(part))
 
-        # 3) (Opcional) Campo en compañía
-        if hasattr(company, "intermediate_journal_ids"):
-            try:
-                ids_set.update(company.intermediate_journal_ids.ids)
-            except Exception:
-                # si el campo no existe o no está cargado, ignorar
-                pass
+        Journal = self.env["account.journal"]
+        if "intermediate_diary" in Journal._fields:
+            interm_journals = Journal.search([
+                ("intermediate_diary", "=", True),
+                ("company_id", "=", company.id),
+            ])
+            ids_set.update(interm_journals.ids)
 
         # Evita tuplas vacías en SQL
         return tuple(ids_set) or (0,) 
