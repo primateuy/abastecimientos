@@ -1,13 +1,10 @@
 # -*- coding: utf-8 -*-
 {
     'name': "TChistorico",
-
     'summary': "Histórico de mercadería en moneda secundaria",
-
     'description': """
 Long description of module's purpose
     """,
-
     'author': "Avance Software",
     'website': "https://www.yourcompany.com",
 
@@ -19,16 +16,15 @@ Long description of module's purpose
 
     # any module necessary for this one to work correctly
     'depends': ['base', 'stock', 'stock_landed_costs', 'stock_account', 'account_accountant', 'purchase', 'sale_management'],
-
-    # always loaded
     'data': [
-        # 'security/ir.model.access.csv',
         'views/views.xml',
         'views/templates.xml',
-    ],
-    # only loaded in demonstration mode
-    'demo': [
-        'demo/demo.xml',
-    ],
+        'views/stock_quant_view.xml',
+        'wizard/recompute_svl.xml',
+        'wizard/recompute_landed_cost.xml',
+        'views/stock_quant_product_location_report.xml',
+        'security/ir.model.access.csv',
+        'views/stock_valuation_adjustment_lines.xml',
+    ]
 }
 

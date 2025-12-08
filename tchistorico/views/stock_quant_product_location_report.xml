@@ -1,0 +1,38 @@
+<!-- my_module/views/stock_quant_product_location_report_views.xml -->
+<odoo>
+
+    <!-- Vista tree -->
+    <record id="view_stock_quant_product_location_report_tree" model="ir.ui.view">
+        <field name="name">stock.quant.product.location.report.tree</field>
+        <field name="model">stock.quant.product.location.report</field>
+        <field name="arch" type="xml">
+            <tree string="Stock por producto y ubicación" create="false" edit="false">
+                <field name="product_id" type="row"/>
+                <field name="product_tmpl_id" invisible="1"/>
+                <field name="location_id" type="column"/>
+                <field name="company_id"/>
+                <field name="quantity" sum="Total cantidad"/>
+                <field name="reserved_quantity" sum="Total reservada"/>
+                <field name="available_quantity" sum="Total disponible"/>
+                <field name="value_report" type="measure"/>
+
+            </tree>
+        </field>
+    </record>
+
+
+  <!-- Acción -->
+  <record id="action_stock_quant_product_location_report" model="ir.actions.act_window">
+    <field name="name">Costo por ubicación</field>
+    <field name="res_model">stock.quant.product.location.report</field>
+    <field name="view_mode">pivot</field>
+  </record>
+
+
+  <!-- Reporte -->
+  <menuitem id="menu_stock_quant_product_location_report"
+            name="Stock por Almacén"
+            action="action_stock_quant_product_location_report"
+            parent="stock.menu_stock_inventory_control"/>
+
+</odoo>

@@ -1,0 +1,18 @@
+<odoo>
+    <record id="view_landed_cost_form_adjustment_lines_extend" model="ir.ui.view">
+        <field name="name">view.landed.cost.form.adjustment.lines.extend</field>
+        <field name="model">stock.landed.cost</field>
+        <field name="inherit_id" ref="stock_landed_costs.view_stock_landed_cost_form"/>
+
+        <field name="arch" type="xml">
+
+            <xpath expr="//field[@name='valuation_adjustment_lines']/tree" position="inside">
+                <field name="former_cost_mr" string="Valor original"/>
+                <field name="final_cost_mr" string="Costo final"/>
+                <field name="additional_landed_cost_mr" string="Costo adicional"/>
+                <field name="cotizacion_mr" string="Cotizacion"/>
+            </xpath>
+
+        </field>
+    </record>
+</odoo>

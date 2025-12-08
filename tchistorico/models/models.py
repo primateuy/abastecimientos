@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from odoo import models, fields, api
+from odoo import models, fields, api, _
 import logging
 from odoo.exceptions import UserError
 
@@ -13,6 +13,15 @@ class StockValuationLayer(models.Model):
     valorMonedaSecundaria = fields.Monetary(string='Valor en moneda secundaria',
                                           currency_field='moneda_reporte_id',
                                           help='Valor en la moneda de reporte.', store=True)
+
+    valorRestante = fields.Monetary(string='Valor restante en moneda secundaria',
+                                            currency_field='moneda_reporte_id',
+                                            help='Valor restante en la moneda de reporte.', store=True)
+
+    valorUnitario = fields.Monetary(string='Valor unitario en moneda secundaria',
+                                            digits=(16, 6),
+                                            currency_field='moneda_reporte_id',
+                                            help='Valor unitario en moneda secundaria.', store=True)
     
     unit_cost_report = fields.Float(string='Costo unitario MR',
                                   digits='Product Price',
@@ -74,10 +83,7 @@ class StockValuationLayer(models.Model):
         string="Cotización del día inversa",
         compute= 'computeCompanyRate',
         store=False
-       
     )
-
-
 
     @api.model
     def _read_group_orderby(self, orderby, read_group_orderby, domain):
@@ -132,6 +138,29 @@ class StockValuationLayer(models.Model):
             layer.unit_cost_report = layer.unit_cost * (layer.cotizacionDia or 1)
 
 
+    def compute_remaining_value(self):
+        for rec in self:
+            # Tomamos solo la fecha (sin hora)
+            fecha = fields.Date.to_date(rec.create_date)
+
+            # Moneda de reporte de la compañía
+            currency_id = rec.company_id.monedaDeReporte.id
+
+            # Buscar la ÚLTIMA cotización <= fecha, para esa moneda
+            tipo_cambio = self.env['res.currency.rate'].search([
+                ('currency_id', '=', currency_id),
+                ('name', '<=', fecha),
+            ], order='name desc', limit=1)
+
+            if tipo_cambio:
+                rec.valorRestante = rec.remaining_value * tipo_cambio.rate
+                rec.valorMonedaSecundaria = rec.value * tipo_cambio.rate
+                rec.valorUnitario = rec.unit_cost * tipo_cambio.rate
+            else:
+                # Si nunca hubo cotización previa, dejar 0 o lo que quieras
+                rec.valorRestante = 0
+                rec.valorUnitario = 0
+                rec.valorMonedaSecundaria = 0
 
 
 
@@ -139,8 +168,7 @@ class StockValuationLayer(models.Model):
     def create(self, vals):
         company_id = vals.get('company_id') or self.env.company.id
         company = self.env['res.company'].browse(company_id)
-        product = self.env['product.product'].browse(vals.get('product_id'))
-        moneda_reporte = company.monedaDeReporte;
+        moneda_reporte = company.monedaDeReporte
         fecha = vals.get('create_date') or fields.Date.context_today(self)
         cantidad_svl = vals.get('quantity', 0)
         if cantidad_svl == 0:
@@ -183,6 +211,8 @@ class StockValuationLayer(models.Model):
             vals.update({
                 'cotizacionDia': cotizacion,
                 'valorMonedaSecundaria': float(vals['value']) * cotizacion,
+                'valorRestante': float(vals['remaining_value']) * cotizacion,
+                'valorUnitario': float(vals['unit_cost']) * cotizacion,
                 'moneda_reporte_id': moneda_reporte.id,
                 'unitCostesDestinoInc': (float(vals['value'])) / cantidad_svl,
                 'unitCostesDestinoIncMR': (float(vals['value']) * cotizacion) / cantidad_svl,
@@ -207,6 +237,8 @@ class StockValuationLayer(models.Model):
                 vals.update({
                     'cotizacionDia': cotizacion or 1.0,
                     'valorMonedaSecundaria': float(vals['value']) * cotizacion,
+                'valorRestante': float(vals['remaining_value']) * cotizacion,
+                'valorUnitario': float(vals['unit_cost']) * cotizacion,
                     'moneda_reporte_id': moneda_reporte.id,
                     'unitCostesDestinoInc': float(vals['value']),
                     'unitCostesDestinoIncMR': float(vals['value']) * cotizacion,
@@ -219,6 +251,8 @@ class StockValuationLayer(models.Model):
                 vals.update({
                     'cotizacionDia': 0.0,
                     'valorMonedaSecundaria': 0.0,
+                    'valorRestante': 0.0,
+                    'valorUnitario': 0.0,
                     'moneda_reporte_id': False,
                     
                 })
@@ -226,6 +260,8 @@ class StockValuationLayer(models.Model):
             vals.update({
                 'cotizacionDia': 0.0,
                 'valorMonedaSecundaria': 0.0,
+                'valorRestante': 0.0,
+                'valorUnitario': 0.0,
                 'moneda_reporte_id': False
             })
 

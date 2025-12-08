@@ -10,24 +10,25 @@
         
         
         <xpath expr="//field[@name='quantity']" position="after">
-          <field string="* Valor en moneda reporte" options="{'currency_field': 'moneda_reporte_id'}" name="valorMonedaSecundaria" optional="show" />
-          <field 
-          string="* Moneda secundaria" name="moneda_reporte_id" optional="show" />
+          <field string="* Valor total MR" options="{'currency_field': 'moneda_reporte_id'}" name="valorMonedaSecundaria" optional="show" />
+          <field string="* Valor restante MR" options="{'currency_field': 'moneda_reporte_id'}" name="valorRestante" optional="show" />
+          <field string="* Valor unitario MR" options="{'currency_field': 'moneda_reporte_id'}" name="valorUnitario" optional="show" />
+          <field
+          string="* Moneda secundaria" name="moneda_reporte_id" optional="hide" />
           <field name="cotizacionDia" optional="hide" string="* Tipo de Cambio"  widget="float"/>
           <field name="ucmr" 
                  widget="float" 
                  options="{'currency_field': 'moneda_reporte_id'}"
                  string="* UCMR"
-                 optional="show"
-                 
+                 optional="hide"
                  />
           
-          <field name="inverse_company_rate" optional="show" string="* Cotización del día"/>
+          <field name="inverse_company_rate" optional="hide" string="* Cotización del día"/>
           <field name="company_rate" optional="hide" string="* Cotización del día inversa"/>
           <field invisible="quantity == 0" name="unitCostesDestinoInc" widget="monetary" optional="hide" options="{'currency_field': 'currency_id'}" string="* Costo total unitario"/>
-          <field invisible="quantity == 0" name="unitCostesDestinoIncMR" widget="monetary" optional="show" options="{'currency_field': 'moneda_reporte_id'}" string="* Costo total unitario MR"/>
+          <field invisible="quantity == 0" name="unitCostesDestinoIncMR" widget="monetary" optional="hide" options="{'currency_field': 'moneda_reporte_id'}" string="* Costo total unitario MR"/>
           <field invisible="quantity == 0" name="valorizadoCosteDestino" widget="monetary" optional="hide" options="{'currency_field': 'currency_id'}" string="* Costo total"/>
-          <field invisible="quantity == 0" name="valorizadoCosteDestinoMR" widget="monetary" optional="show" options="{'currency_field': 'moneda_reporte_id'}" string="* Costo total MR"/>
+          <field invisible="quantity == 0" name="valorizadoCosteDestinoMR" widget="monetary" optional="hide" options="{'currency_field': 'moneda_reporte_id'}" string="* Costo total MR"/>
           
         </xpath>
       </field>
