@@ -1,0 +1,17 @@
+<!-- views/landed_cost_lines_extend.xml -->
+<odoo>
+    <record id="view_landed_cost_form_adjustment_lines_extend" model="ir.ui.view">
+        <field name="name">view.landed.cost.form.adjustment.lines.extend</field>
+        <field name="model">stock.landed.cost</field>
+        <!-- Heredamos la vista formulario de Costos en destino -->
+        <field name="inherit_id" ref="stock_landed_costs.view_stock_landed_cost_form"/>
+
+        <field name="arch" type="xml">
+            <!-- Tabla de Ajustes de valoración: valuation_adjustment_lines -->
+            <xpath expr="//field[@name='valuation_adjustment_lines']/tree" position="inside">
+                <!-- Campo related que definiste en stock.valuation.adjustment.lines -->
+                <field name="referencia_layer" string="Referencia"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

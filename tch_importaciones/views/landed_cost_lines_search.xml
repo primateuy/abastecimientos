@@ -1,0 +1,22 @@
+<odoo>
+        <record id="view_val_adj_lines_search_cost" model="ir.ui.view">
+        <field name="name">stock.valuation.adjustment.lines.search.cost</field>
+        <field name="model">stock.valuation.adjustment.lines</field>
+        <field name="arch" type="xml">
+            <search string="Buscar líneas de movimiento">
+                <field name="name" string="Descripción"/>
+                <field name="product_id" string="Producto"/>
+
+                <filter name="positive_cost"
+                        string="Costo > 0"
+                        domain="[('final_cost', '>', 0)]"/>
+
+                <group expand="0" string="Agrupar por">
+                    <filter name="group_by_product"
+                            string="Producto"
+                            context="{'group_by': 'product_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+</odoo>

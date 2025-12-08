@@ -1,0 +1,25 @@
+<odoo>
+    <record id="view_picking_form_inherit_test_button" model="ir.ui.view">
+        <field name="name">stock.picking.form.inherit.test.button</field>
+        <field name="model">stock.picking</field>
+        <field name="inherit_id" ref="stock.view_picking_form"/>
+        <field name="arch" type="xml">
+
+
+
+            <!-- Insertar dentro del button_box (zona de botones inteligentes) -->
+            <xpath expr="//div[@name='button_box']" position="inside">
+                <button name="action_open_move_lines"
+                        type="object"
+                        string="Costo importación"
+                        class="oe_stat_button"
+                        icon="fa-cogs">
+                    <!-- El field con widget statinfo se muestra como número + etiqueta -->
+                   <!-- <field name="x_example_count"
+                           string="Ejemplo"
+                           widget="statinfo"/>-->
+                </button>
+             </xpath>
+        </field>
+    </record>
+</odoo>

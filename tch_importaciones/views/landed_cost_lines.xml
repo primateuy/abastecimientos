@@ -1,0 +1,25 @@
+<odoo>
+    <!-- TREE propia para stock.valuation.adjustment.lines -->
+    <record id="view_stock_valuation_adjustment_lines_tree_custom" model="ir.ui.view">
+        <field name="name">stock.valuation.adjustment.lines.tree.custom</field>
+        <field name="model">stock.valuation.adjustment.lines</field>
+        <field name="arch" type="xml">
+            <tree string="Líneas de costo">
+                <!-- Mostrá acá lo que te interese -->
+                <field name="cost_id"/>          <!-- documento de costo -->
+                <field name="product_id"/>       <!-- producto -->
+                <field name="name"/>             <!-- descripción -->
+                <field name="quantity"/>         <!-- cantidad -->
+                <field name="final_cost_mr"/>       <!-- costo total -->
+                <field name="final_cost" optional="hidden"/>       <!-- costo total -->
+                <field name="final_cost_mr"/>       <!-- costo total -->
+                <field name="additional_landed_cost_mr"/> <!-- costo adicional -->
+                <field name="additional_landed_cost" optional="hidden"/> <!-- costo adicional -->
+                <field name="former_cost_mr"/>      <!-- costo original -->
+                <field name="former_cost" optional="hidden"/>      <!-- costo original -->
+                <field name="cotizacion_mr"/>       <!-- cotización -->
+                <field name="referencia_layer"/>    <!-- referencia layer -->
+            </tree>
+        </field>
+    </record>
+</odoo>

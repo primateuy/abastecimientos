@@ -1,0 +1,22 @@
+<odoo>
+    <!-- Acción -->
+    <record id="action_tch_importacion" model="ir.actions.act_window">
+        <field name="name">Importaciones</field>
+        <field name="res_model">tch.importacion</field>
+        <field name="view_mode">tree,form</field>
+        <field name="help" type="html">
+            <p>
+                Gestiona las importaciones asociando traslados y obteniendo el costo unitario en destino.
+            </p>
+        </field>
+    </record>
+
+    <!-- Menú: dentro de Inventario / Configuración por ahora (lo ajustamos luego si querés) -->
+    <menuitem
+        id="menu_tch_importacion_root"
+        name="Importaciones"
+        parent="stock.menu_stock_root"
+        sequence="90"
+        action="action_tch_importacion"
+    />
+</odoo>

@@ -1,0 +1,42 @@
+<odoo>
+    <record id="view_tch_importacion_form" model="ir.ui.view">
+        <field name="name">tch.importacion.form</field>
+        <field name="model">tch.importacion</field>
+        <field name="arch" type="xml">
+            <form string="Importación">
+                <sheet>
+                    <!-- Smart buttons -->
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_open_move_lines"
+                                type="object"
+                                class="oe_stat_button"
+                                icon="fa-cogs">
+                            <span>Costo importación</span>
+                        </button>
+                    </div>
+
+                    <group>
+                        <field name="name"/>
+                        <field name="date"/>
+                        <field name="company_id"/>
+                        <field name="currency_id" readonly="1"/>
+                    </group>
+
+                    <group>
+                        <field name="picking_ids"
+                               widget="many2many_tags"
+                               options="{'no_create_edit': True}"/>
+                    </group>
+
+                    <notebook>
+                        <page string="Resumen">
+                            <group>
+                                <field name="total_additional_landed_cost_mr"/>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+</odoo>
