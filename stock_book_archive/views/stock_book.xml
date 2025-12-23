@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Incluir campo active en la vista de formulario -->
+    <record id="view_stock_book_form_inherit_archive" model="ir.ui.view">
+        <field name="name">stock.book.form.archive</field>
+        <field name="model">stock.book</field>
+        <field name="inherit_id" ref="stock_voucher.view_stock_book_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//sheet" position="inside">
+                <field name="active" invisible="1"/>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>
