@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    
+    <record id="res_config_settings_view_form_inherit_cash_rounding" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.inherit.account.cash.rounding</field>
+        <field name="model">res.config.settings</field> <!-- odoo11 -->
+        <field name="inherit_id" ref="account.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+           <!--  <xpath expr="//div[@data-key='account']" position="inside"> -->
+            <xpath expr="//block[@id='analytic']" position="after">
+                    <h2>Sales Round Off</h2>
+                    <div class="row mt16 o_settings_container">
+                        <div class="col-xs-12 col-md-6 o_setting_box">
+                            <div class="o_setting_right_pane">
+                                <label for="custom_rounding_product_id"/>
+                                <div class="text-muted">
+                                    Add Round Off Product for Sales
+                                </div>
+                                <field name="custom_rounding_product_id" class="o_light_label mt16"/>
+                            </div>
+                        </div>
+                   </div>
+            </xpath>
+        </field>
+    </record>
+    
+</odoo>

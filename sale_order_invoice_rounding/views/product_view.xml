@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <record id="product_normal_form_view_inherit_rounding_cash" model="ir.ui.view">
+            <field name="name">product.product.form.inherit.view.rounding</field>
+            <field name="model">product.product</field>
+            <field name="inherit_id" ref="product.product_normal_form_view"/>
+            <field name="arch" type="xml">
+                <xpath expr="//group[@name='description']" position="inside">
+                  <!-- <group name="description" position="after"> -->
+                    <group name="round_off_product">
+                        <group string="Round Off" name="custom_round_off">
+                            <field name="custom_is_rounding_product"/>
+                        </group>
+                    </group>
+                </xpath>
+            </field>
+        </record>
+    </data>
+</odoo>
