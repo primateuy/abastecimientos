@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<odoo>
+    <data>
+        <record id="so_inv_rounding_form_view" model="ir.ui.view">
+            <field name="model">custom.so.inv.rounding</field>
+            <field name="name">custom.so.inv.rounding.form</field>
+                <field name="arch" type="xml">
+                    <form string="Round Off">
+                        <span class="o_form_label">This wizard will add new line for the round off amount.</span>
+                        <group>
+                            <field name="rounding_value"/>
+                        </group>
+                        <footer>
+                            <button name="action_rounding_amount" type="object" string="Apply" class="btn-primary"/>
+                            or
+                            <button string="_Cancel" class="btn-default" special="cancel" />
+                        </footer>
+                    </form>
+                </field>
+        </record>
+
+       <record id="action_so_inv_rounding_wiz" model="ir.actions.act_window">
+            <field name="name">Round Off</field>
+            <field name="res_model">custom.so.inv.rounding</field>
+            <field name="view_mode">form</field>
+            <field name="target">new</field>
+        </record>
+   </data>
+</odoo>
