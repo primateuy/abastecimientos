@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+
+    <template id="delivery_informations_padding" inherit_id="l10n_ar_stock.report_delivery_document">
+        <div id="informations" position="attributes">
+            <attribute name="style">padding-top: 50px;</attribute>
+        </div>
+    </template>
+
+</odoo>

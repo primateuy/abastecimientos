@@ -6,16 +6,29 @@
         <field name="active">False</field>
     </record>
 
-    <!-- Desactiva el override de contenido AR para usar siempre el reporte nativo -->
+    <!-- Reactivar el override AR para que empresas AR sigan usando su template -->
     <record id="l10n_ar_stock.report_delivery_document" model="ir.ui.view">
-        <field name="active">False</field>
+        <field name="active">True</field>
     </record>
 
-    <!-- Todas las empresas usan el template nativo con ubicaciones -->
+
+    <!--
+        - Empresas UY: template nativo con customizaciones locales
+        - Empresas AR: template AR de l10n_ar_stock con copies (ORIGINAL/DUPLICADO/TRIPLICADO)
+        - Resto: template estandar de Odoo
+    -->
     <template id="report_deliveryslip_fix" inherit_id="stock.report_deliveryslip" priority="50">
         <t t-foreach="docs" position="replace">
             <t t-foreach="docs" t-as="o">
-                <t t-call="fix_delivery_report_ar.report_delivery_document_native" t-lang="o._get_report_lang()"/>
+                <t t-if="o.company_id.country_id.code == 'UY'">
+                    <t t-call="fix_delivery_report_ar.report_delivery_document_native" t-lang="o._get_report_lang()"/>
+                </t>
+                <t t-elif="o.company_id.country_id.code == 'AR'">
+                    <t t-call="stock.report_delivery_document" t-lang="o._get_report_lang()"/>
+                </t>
+                <t t-else="">
+                    <t t-call="stock.report_delivery_document" t-lang="o._get_report_lang()"/>
+                </t>
             </t>
         </t>
     </template>
