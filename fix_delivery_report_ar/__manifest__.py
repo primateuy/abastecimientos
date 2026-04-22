@@ -8,6 +8,7 @@
     "data": [
         "views/report_delivery_document_native.xml",
         "views/report_deliveryslip.xml",
+        "views/report_custom_header.xml",
     ],
     "installable": True,
     "application": False,

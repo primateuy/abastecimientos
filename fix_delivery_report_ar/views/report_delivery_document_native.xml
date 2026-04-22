@@ -14,7 +14,7 @@
 
                 <t t-set="address">
                     <div name="div_outgoing_address">
-                        <t t-set="addr_partner" t-value="o.move_ids[0].partner_id or o.partner_id"/>
+                        <t t-set="addr_partner" t-value="(o.move_ids and o.move_ids[0].partner_id) or o.partner_id"/>
                         <div name="outgoing_delivery_address" t-if="o.should_print_delivery_address() and addr_partner">
                             <strong>Dirección de Entrega:</strong><br/>
                             <span t-if="addr_partner.name" t-out="addr_partner.name"/><br t-if="addr_partner.name"/>
