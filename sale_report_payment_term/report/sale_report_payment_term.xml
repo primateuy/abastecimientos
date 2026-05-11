@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="report_saleorder_document_payment_term"
+              inherit_id="sale.report_saleorder_document">
+        <xpath expr="//div[@id='informations']" position="inside">
+            <div t-if="doc.payment_term_id" class="col-auto col-3 mw-100 mb-2">
+                <strong>Plazos de pago:</strong><br/>
+                <span class="m-0" t-field="doc.payment_term_id">30 Días</span>
+            </div>
+        </xpath>
+    </template>
+</odoo>
