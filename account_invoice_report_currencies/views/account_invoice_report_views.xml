@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        Pivot: se activa "Valor en MR" como medida por defecto porque tiene
+        datos cargados. "Importe Divisa Secundaria" no se declara acá a
+        propósito: Odoo lo ofrece igual en el desplegable de Medidas, y así no
+        se muestra una columna en cero hasta que se carguen los datos.
+    -->
+    <record id="view_account_invoice_report_pivot_currencies" model="ir.ui.view">
+        <field name="name">account.invoice.report.pivot.currencies</field>
+        <field name="model">account.invoice.report</field>
+        <field name="inherit_id" ref="account.view_account_invoice_report_pivot"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='price_subtotal']" position="after">
+                <field name="valor_moneda_reportes" type="measure"/>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- Lista: ambas medidas disponibles como columnas opcionales. -->
+    <record id="account_invoice_report_view_tree_currencies" model="ir.ui.view">
+        <field name="name">account.invoice.report.view.tree.currencies</field>
+        <field name="model">account.invoice.report</field>
+        <field name="inherit_id" ref="account.account_invoice_report_view_tree"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='price_total']" position="after">
+                <field name="moneda_reportes_id" optional="hide"/>
+                <field name="valor_moneda_reportes" optional="show" sum="Total"/>
+                <field name="secondary_currency_id" optional="hide"/>
+                <field name="amount_secondary" optional="hide" sum="Total"/>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>
