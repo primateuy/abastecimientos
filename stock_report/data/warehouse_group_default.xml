@@ -1,8 +1,8 @@
 <odoo>
-    <record id="stock_warehouse_group_default" model="stock.warehouse.group">
-        <field name="name">Sin grupo</field>
-        <field name="active" eval="False"/>
-    </record>
+    <data noupdate="1">
+        <record id="stock_warehouse_group_default" model="stock.warehouse.group.report">
+            <field name="name">Sin grupo</field>
+            <field name="active" eval="False"/>
+        </record>
+    </data>
 </odoo>
-
-
